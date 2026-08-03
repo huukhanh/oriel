@@ -90,12 +90,20 @@ final class InjectionIntegrationTests: XCTestCase {
         XCTFail("page never finished loading")
     }
 
-    private func evaluate(_ javaScript: String, in webView: WKWebView) async throws -> Any? {
+    /// Returns a `String` rather than `Any`.
+    ///
+    /// `evaluateJavaScript` hands back `Any`, which is not `Sendable`, so
+    /// resuming a continuation with it is a data race under Swift 6 — the real
+    /// compiler rejected the obvious version. Stringifying inside the JS keeps
+    /// only a `String?` crossing the boundary.
+    private func evaluate(_ javaScript: String, in webView: WKWebView) async throws -> String? {
         try await withCheckedThrowingContinuation { continuation in
-            webView.evaluateJavaScript(javaScript, in: nil, in: .page) { result in
+            webView.evaluateJavaScript("String(\(javaScript))", in: nil, in: .page) { result in
                 switch result {
-                case .success(let value): continuation.resume(returning: value)
-                case .failure(let error): continuation.resume(throwing: error)
+                case .success(let value):
+                    continuation.resume(returning: value as? String)
+                case .failure(let error):
+                    continuation.resume(throwing: error)
                 }
             }
         }
@@ -107,7 +115,7 @@ final class InjectionIntegrationTests: XCTestCase {
         let webView = try makeWebView(scripts: [])
         try await load(webView, at: "https://example.com/")
 
-        let type = try await evaluate("typeof window.__inj", in: webView) as? String
+        let type = try await evaluate("typeof window.__inj", in: webView)
         XCTAssertEqual(
             type,
             "object",
@@ -145,9 +153,12 @@ final class InjectionIntegrationTests: XCTestCase {
 
         _ = try await evaluate(
             """
-            window.webkit.messageHandlers.scriptLog.postMessage(
-                { level: "log", script: "raw", msg: "direct" }
-            );
+            (function () {
+                window.webkit.messageHandlers.scriptLog.postMessage(
+                    { level: "log", script: "raw", msg: "direct" }
+                );
+                return "sent";
+            })()
             """,
             in: webView
         )
@@ -186,8 +197,8 @@ final class InjectionIntegrationTests: XCTestCase {
         let registered = try await evaluate(
             "Object.keys(window.__inj._entries).length",
             in: webView
-        ) as? Int
-        XCTAssertEqual(registered, 0, "a disabled script must not even be injected")
+        )
+        XCTAssertEqual(registered, "0", "a disabled script must not even be injected")
     }
 
     // MARK: - built-ins, from the real bundle
@@ -210,14 +221,14 @@ final class InjectionIntegrationTests: XCTestCase {
         let webView = try makeWebView(scripts: [script])
         try await load(webView, at: "https://example.com/")
 
-        let hidden = try await evaluate("document.hidden", in: webView) as? Bool
-        XCTAssertEqual(hidden, false)
+        let hidden = try await evaluate("document.hidden", in: webView)
+        XCTAssertEqual(hidden, "false")
 
         let own = try await evaluate(
             "Object.prototype.hasOwnProperty.call(document, 'hidden')",
             in: webView
-        ) as? Bool
-        XCTAssertEqual(own, true, "the override is not installed on this document")
+        )
+        XCTAssertEqual(own, "true", "the override is not installed on this document")
     }
 
     // MARK: - the media bridge
@@ -226,7 +237,7 @@ final class InjectionIntegrationTests: XCTestCase {
         let webView = try makeWebView(scripts: [])
         try await load(webView, at: "https://example.com/")
 
-        let outcome = try await evaluate("window.__inj.media.enterPiP()", in: webView) as? String
+        let outcome = try await evaluate("window.__inj.media.enterPiP()", in: webView)
         // No media on the page, so this is the honest answer rather than a
         // silent no-op.
         XCTAssertEqual(outcome, "no-media")
