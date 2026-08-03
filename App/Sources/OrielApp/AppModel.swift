@@ -237,6 +237,34 @@ final class AppModel: ObservableObject {
         }
     }
 
+    // MARK: - GM storage
+    //
+    // Keyed by script id, so two scripts using "count" do not collide and
+    // deleting a script takes its data with it.
+
+    func scriptValue(scriptID: String, key: String) -> String? {
+        return state.scriptValues[scriptID]?[key]
+    }
+
+    func setScriptValue(scriptID: String, key: String, value: String?) {
+        var bucket = state.scriptValues[scriptID] ?? [:]
+        if let value {
+            bucket[key] = value
+        } else {
+            bucket.removeValue(forKey: key)
+        }
+        if bucket.isEmpty {
+            state.scriptValues.removeValue(forKey: scriptID)
+        } else {
+            state.scriptValues[scriptID] = bucket
+        }
+        persist()
+    }
+
+    func scriptValueKeys(scriptID: String) -> [String] {
+        return (state.scriptValues[scriptID].map { Array($0.keys) } ?? []).sorted()
+    }
+
     func mediaStateChanged(_ state: MediaState) {
         media.setPlaying(state.playing)
         if state.hasMedia, state.playing {

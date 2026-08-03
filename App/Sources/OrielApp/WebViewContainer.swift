@@ -38,11 +38,24 @@ struct WebViewContainer: UIViewRepresentable {
         )
         webView.navigationDelegate = context.coordinator
 
+        let storeBridge = ScriptStoreBridge(
+            read: { [weak model] scriptID, key in
+                model?.scriptValue(scriptID: scriptID, key: key)
+            },
+            write: { [weak model] scriptID, key, value in
+                model?.setScriptValue(scriptID: scriptID, key: key, value: value)
+            },
+            list: { [weak model] scriptID in
+                model?.scriptValueKeys(scriptID: scriptID) ?? []
+            }
+        )
+
         let preludeSource = BuiltinLibrary.prelude() ?? ""
         let injection = InjectionController(
             contentController: contentController,
             preludeSource: preludeSource,
-            bridge: bridge
+            bridge: bridge,
+            storeBridge: storeBridge
         )
 
         model.attach(webView: webView, injection: injection)

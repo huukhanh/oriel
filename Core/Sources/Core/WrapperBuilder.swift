@@ -36,6 +36,10 @@ public enum WrapperBuilder {
                     var GM_addStyle = GM.addStyle;
                     var GM_log = GM.log;
                     var GM_info = GM.info;
+                    var GM_setValue = GM.setValue;
+                    var GM_getValue = GM.getValue;
+                    var GM_deleteValue = GM.deleteValue;
+                    var GM_listValues = GM.listValues;
             /* ---- user source begins ---- */
             \(source)
             /* ---- user source ends ---- */

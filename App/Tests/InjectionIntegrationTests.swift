@@ -52,6 +52,15 @@ final class InjectionIntegrationTests: XCTestCase {
     }
 
     /// Builds the real thing: real controller, real factory, real wrapper.
+    /// Stands in for AppModel's persistence, so the storage round trip is
+    /// observable without a real store on disk.
+    @MainActor
+    final class FakeStore {
+        var values: [String: [String: String]] = [:]
+    }
+
+    private let store = FakeStore()
+
     private func makeWebView(
         scripts: [Script],
         onLog: @escaping @MainActor (LogEntry) -> Void = { _ in },
@@ -59,10 +68,27 @@ final class InjectionIntegrationTests: XCTestCase {
     ) throws -> WKWebView {
         let controller = WKUserContentController()
         let bridge = ScriptBridge(onLog: onLog, onMedia: onMedia)
+        let store = self.store
+        let storeBridge = ScriptStoreBridge(
+            read: { scriptID, key in store.values[scriptID]?[key] },
+            write: { scriptID, key, value in
+                var bucket = store.values[scriptID] ?? [:]
+                if let value {
+                    bucket[key] = value
+                } else {
+                    bucket.removeValue(forKey: key)
+                }
+                store.values[scriptID] = bucket
+            },
+            list: { scriptID in
+                (store.values[scriptID].map { Array($0.keys) } ?? []).sorted()
+            }
+        )
         let injection = InjectionController(
             contentController: controller,
             preludeSource: try preludeSource(),
-            bridge: bridge
+            bridge: bridge,
+            storeBridge: storeBridge
         )
         injection.rebuild(with: scripts)
         let webView = WebViewFactory.make(settings: Settings(), contentController: controller)
@@ -303,5 +329,66 @@ final class InjectionIntegrationTests: XCTestCase {
             try await Task.sleep(nanoseconds: 50_000_000)
         }
         XCTFail("condition not met within \(timeout)s")
+    }
+
+    // MARK: - GM storage
+
+    /// `WKScriptMessageHandlerWithReply` is a different protocol from the plain
+    /// handler, and registering it with the wrong `add` overload compiles and
+    /// then simply never delivers. Only a round trip shows that.
+    func testGMSetValueAndGetValueRoundTrip() async throws {
+        let received = Received()
+        let webView = try makeWebView(
+            scripts: [
+                userScript(
+                    id: "storer",
+                    match: "*://*.example.com/*",
+                    body: """
+                        GM_setValue("count", 41).then(function () {
+                            return GM_getValue("count", 0);
+                        }).then(function (value) {
+                            GM_log("read back " + (value + 1));
+                        });
+                        """
+                )
+            ],
+            onLog: { entry in received.append(entry) }
+        )
+        try await load(webView, at: "https://example.com/")
+        try await poll { received.entries.isEmpty == false }
+
+        XCTAssertEqual(received.entries.first?.message, "read back 42")
+        XCTAssertEqual(
+            store.values["storer"]?["count"],
+            "41",
+            "the value should be persisted as JSON under the script's own id"
+        )
+    }
+
+    func testGMStorageIsScopedPerScript() async throws {
+        store.values["other"] = ["count": "999"]
+        let received = Received()
+        let webView = try makeWebView(
+            scripts: [
+                userScript(
+                    id: "reader",
+                    match: "*://*.example.com/*",
+                    body: """
+                        GM_getValue("count", "absent").then(function (value) {
+                            GM_log(String(value));
+                        });
+                        """
+                )
+            ],
+            onLog: { entry in received.append(entry) }
+        )
+        try await load(webView, at: "https://example.com/")
+        try await poll { received.entries.isEmpty == false }
+
+        XCTAssertEqual(
+            received.entries.first?.message,
+            "absent",
+            "one script read another script's value — the keys are not scoped"
+        )
     }
 }

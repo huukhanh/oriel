@@ -179,6 +179,71 @@
                 return style;
             },
 
+            // GM_setValue / GM_getValue.
+            //
+            // Async, unlike Tampermonkey's synchronous pair. There is no way to
+            // block a content-world script on a round trip to Swift, and
+            // pretending otherwise — caching and writing back — would hand the
+            // user a value that is silently stale after an edit in another tab
+            // or a script reload. Documented in docs/userscript-api.md.
+            setValue: function (key, value) {
+                try {
+                    return global.webkit.messageHandlers.scriptStore.postMessage({
+                        op: "set",
+                        script: entry.id,
+                        key: String(key),
+                        value: JSON.stringify(value === undefined ? null : value)
+                    });
+                } catch (e) {
+                    return Promise.reject(new Error("storage bridge unavailable"));
+                }
+            },
+
+            getValue: function (key, fallback) {
+                try {
+                    return global.webkit.messageHandlers.scriptStore
+                        .postMessage({ op: "get", script: entry.id, key: String(key) })
+                        .then(function (raw) {
+                            if (raw === null || raw === undefined) {
+                                return fallback;
+                            }
+                            try {
+                                return JSON.parse(raw);
+                            } catch (e) {
+                                // Stored by an older version, or hand-edited.
+                                // Returning the raw string beats throwing.
+                                return raw;
+                            }
+                        });
+                } catch (e) {
+                    return Promise.reject(new Error("storage bridge unavailable"));
+                }
+            },
+
+            deleteValue: function (key) {
+                try {
+                    return global.webkit.messageHandlers.scriptStore.postMessage({
+                        op: "delete",
+                        script: entry.id,
+                        key: String(key)
+                    });
+                } catch (e) {
+                    return Promise.reject(new Error("storage bridge unavailable"));
+                }
+            },
+
+            listValues: function () {
+                try {
+                    return global.webkit.messageHandlers.scriptStore
+                        .postMessage({ op: "list", script: entry.id })
+                        .then(function (keys) {
+                            return keys || [];
+                        });
+                } catch (e) {
+                    return Promise.reject(new Error("storage bridge unavailable"));
+                }
+            },
+
             log: function () {
                 var args = Array.prototype.slice.call(arguments);
                 try {

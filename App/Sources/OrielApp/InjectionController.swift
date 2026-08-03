@@ -25,14 +25,18 @@ final class InjectionController {
     /// reference is a good way to get "undefined is not an object" at random.
     private var wiredWorlds: Set<String> = []
 
+    private let storeBridge: ScriptStoreBridge
+
     init(
         contentController: WKUserContentController,
         preludeSource: String,
-        bridge: ScriptBridge
+        bridge: ScriptBridge,
+        storeBridge: ScriptStoreBridge
     ) {
         self.contentController = contentController
         self.preludeSource = preludeSource
         self.bridge = bridge
+        self.storeBridge = storeBridge
     }
 
     /// Replace the entire injected set.
@@ -108,6 +112,14 @@ final class InjectionController {
         let target = contentWorld(for: world)
         contentController.add(bridge, contentWorld: target, name: ScriptBridge.logHandlerName)
         contentController.add(bridge, contentWorld: target, name: ScriptBridge.mediaHandlerName)
+        // A separate call: the reply variant is a different protocol, and
+        // registering it with `add(_:contentWorld:name:)` would compile and
+        // then never deliver.
+        contentController.addScriptMessageHandler(
+            storeBridge,
+            contentWorld: target,
+            name: ScriptStoreBridge.handlerName
+        )
     }
 
     private func contentWorld(for world: ScriptWorld) -> WKContentWorld {

@@ -131,10 +131,34 @@ unchanged.
 | `GM_onRouteChange(fn)` | Called with the new `href` on SPA navigation while the script is running. |
 | `GM_log(...args)` | To the in-app log view. |
 | `GM_info` | `{ id }` — the script's stable id. |
-| `GM_setValue` / `GM_getValue` | **Not yet** — arrives with the storage bridge. |
+| `GM_setValue(key, value)` | Persists per script, JSON-encoded. **Returns a promise** — see below. |
+| `GM_getValue(key, fallback)` | **Returns a promise** resolving to the value, or `fallback`. |
+| `GM_deleteValue(key)` / `GM_listValues()` | Promises likewise. |
 | `GM_xmlhttpRequest` | **Not implemented.** Its purpose is bypassing CORS; that is risk this app does not take on. |
 | `GM_openInTab` | **Not yet.** |
 | `unsafeWindow` | Not provided — in the default `page` world, `window` *is* the page's window. |
+
+### Storage is asynchronous, unlike Tampermonkey
+
+Tampermonkey's `GM_getValue` is synchronous. This app's is not, and cannot be:
+the value lives in Swift, and there is no way to block a content-world script
+on a round trip to the native side.
+
+```js
+const count = await GM_getValue("count", 0);
+await GM_setValue("count", count + 1);
+```
+
+Faking the synchronous shape — caching values and writing back — was considered
+and rejected: it hands the script a value that is silently stale after an edit
+elsewhere or a script reload, and a stale read is worse than an `await`.
+
+**A pasted script calling `GM_getValue` synchronously gets a promise**, which
+will not behave as it expects. That is the one place this app knowingly differs
+from Tampermonkey's surface rather than simply lacking part of it.
+
+Values are scoped per script id, so two scripts using `"count"` do not collide,
+and deleting a script takes its data with it.
 
 Errors thrown by a script body or by a cleanup are caught, reported to the log
 view, and do not stop other scripts. A script that throws partway through still

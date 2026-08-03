@@ -78,6 +78,7 @@ public protocol WKScriptMessageHandler: AnyObject {
     )
 }
 
+@MainActor
 public protocol WKScriptMessageHandlerWithReply: AnyObject {
     func userContentController(
         _ userContentController: WKUserContentController,
