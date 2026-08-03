@@ -9,6 +9,7 @@ struct BrowserView: View {
     @State private var showingScripts = false
     @State private var showingSettings = false
     @State private var showingLog = false
+    @State private var showingLauncher = false
     @State private var addressText = ""
     @State private var editingAddress = false
 
@@ -35,6 +36,10 @@ struct BrowserView: View {
         }
         .sheet(isPresented: $showingLog) {
             LogView()
+                .environmentObject(model)
+        }
+        .sheet(isPresented: $showingLauncher) {
+            LauncherView(onOpen: { showingLauncher = false })
                 .environmentObject(model)
         }
     }
@@ -102,6 +107,11 @@ struct BrowserView: View {
 
             Button(action: { showingLog = true }) {
                 Image(systemName: "text.alignleft")
+                    .frame(maxWidth: .infinity)
+            }
+
+            Button(action: { showingLauncher = true }) {
+                Image(systemName: "square.grid.2x2")
                     .frame(maxWidth: .infinity)
             }
 

@@ -44,6 +44,21 @@ struct ScriptEditorView: View {
                         dismiss()
                     }
                 }
+                ToolbarItem(placement: .bottomBar) {
+                    // §6 calls this the feature that makes on-device authoring
+                    // bearable, and it is: the alternative is a save and a full
+                    // reload per edit. It runs the *wrapped* form, so what
+                    // happens here is what happens after a reload — including
+                    // the match guard, so a script that does not match the
+                    // current page correctly does nothing.
+                    Button("Run on this page now") {
+                        model.runOnCurrentPage(
+                            source: source,
+                            id: scriptID ?? "preview"
+                        )
+                    }
+                    .disabled(metadata.matches.isEmpty)
+                }
             }
         }
         .onAppear {
