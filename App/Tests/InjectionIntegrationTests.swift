@@ -20,9 +20,12 @@ import XCTest
 final class InjectionIntegrationTests: XCTestCase {
 
     private var webView: WKWebView?
+    /// Navigation delegates are weak; the waiter has to be held somewhere.
+    private var loadWaiter: AnyObject?
 
     override func tearDown() async throws {
         webView = nil
+        loadWaiter = nil
     }
 
     // MARK: - helpers
@@ -68,26 +71,62 @@ final class InjectionIntegrationTests: XCTestCase {
     }
 
     private func load(_ webView: WKWebView, at url: String) async throws {
+        let waiter = LoadWaiter()
+        loadWaiter = waiter
+        webView.navigationDelegate = waiter
         webView.loadHTMLString(
             "<!doctype html><html><head><title>t</title></head><body><p>hi</p></body></html>",
             baseURL: URL(string: url)
         )
-        try await waitForLoad(webView)
+        await waiter.waitUntilSettled()
+        // One extra beat so document-start scripts have finished registering.
+        try await Task.sleep(nanoseconds: 200_000_000)
     }
 
-    private func waitForLoad(_ webView: WKWebView) async throws {
-        // Polling rather than a navigation delegate: the delegate slot is part
-        // of what is under test elsewhere, and a test should not quietly take
-        // it over.
-        for _ in 0..<200 {
-            if webView.isLoading == false, webView.url != nil {
-                // One extra turn so document-start scripts have run.
-                try await Task.sleep(nanoseconds: 100_000_000)
+    /// Waits on the navigation delegate rather than polling `isLoading`.
+    ///
+    /// Polling was flaky: a loaded-in-under-a-tick page and a simulator under
+    /// load both defeat it, and the failure mode is a timeout that looks like a
+    /// product bug rather than a test bug.
+    @MainActor
+    private final class LoadWaiter: NSObject, WKNavigationDelegate {
+        private var continuation: CheckedContinuation<Void, Never>?
+        private var settled = false
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation?) {
+            settle()
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            didFail navigation: WKNavigation?,
+            withError error: Error
+        ) {
+            settle()
+        }
+
+        func webView(
+            _ webView: WKWebView,
+            didFailProvisionalNavigation navigation: WKNavigation?,
+            withError error: Error
+        ) {
+            settle()
+        }
+
+        private func settle() {
+            settled = true
+            continuation?.resume()
+            continuation = nil
+        }
+
+        func waitUntilSettled() async {
+            if settled {
                 return
             }
-            try await Task.sleep(nanoseconds: 50_000_000)
+            await withCheckedContinuation { continuation in
+                self.continuation = continuation
+            }
         }
-        XCTFail("page never finished loading")
     }
 
     /// Returns a `String` rather than `Any`.
