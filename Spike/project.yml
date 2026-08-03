@@ -1,0 +1,58 @@
+# Throwaway spike for issue #1 — does background audio survive lock and
+# backgrounding on a real device?
+#
+# Generated with XcodeGen so no .xcodeproj is hand-authored on a box with no
+# Xcode. See ../TESTING.md for the build recipe.
+#
+# SWIFT_VERSION is 5.0 deliberately. The real app targets Swift 6 per
+# docs/decisions/003-minimum-ios.md; this spike exists to answer a media
+# question, and strict-concurrency diagnostics on a throwaway are pure risk
+# with no payoff. The sources are still written main-actor-clean.
+name: BackgroundAudioSpike
+
+options:
+  bundleIdPrefix: com.oriel.spike
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+
+targets:
+  BackgroundAudioSpike:
+    type: application
+    platform: iOS
+    sources:
+      # Swift sources. The two web assets are declared separately below rather
+      # than relying on XcodeGen's extension defaults: if Probe.js silently
+      # misses the resources phase, the app runs, looks fine, and reports zero
+      # heartbeats for ten minutes — a wasted device session with a misleading
+      # result.
+      - path: BackgroundAudioSpike
+        excludes:
+          - "Probe.js"
+          - "control.html"
+      - path: BackgroundAudioSpike/Probe.js
+        buildPhase: resources
+      - path: BackgroundAudioSpike/control.html
+        buildPhase: resources
+    info:
+      path: BackgroundAudioSpike/Info.plist
+      properties:
+        # The entire point of the spike.
+        UIBackgroundModes:
+          - audio
+        UILaunchScreen: {}
+        UIRequiredDeviceCapabilities:
+          - arm64
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.oriel.spike.backgroundaudio
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_PREVIEWS: NO

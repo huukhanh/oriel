@@ -11,6 +11,11 @@ jobs:
       - uses: actions/checkout@v4
       - run: swift build --package-path Core
       - run: swift test --package-path Core
+      # Not a compile. It is a parse, and it is the only automated check that
+      # ever looks at platform code under Spike/ or App/ — it catches
+      # unbalanced braces and malformed syntax that would otherwise be found
+      # by a human on a Mac, minutes later.
+      - run: swift format lint --recursive --strict Core Spike
   web:
     runs-on: ubuntu-latest
     steps:
