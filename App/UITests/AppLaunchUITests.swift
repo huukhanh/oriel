@@ -17,7 +17,10 @@ final class AppLaunchUITests: XCTestCase {
 
     private var app: XCUIApplication!
 
-    override func setUp() {
+    // `async throws` deliberately: the synchronous `setUp()` override inherits
+    // XCTestCase's nonisolated context and cannot touch XCUIApplication, which
+    // is main-actor isolated. The async variant carries the class's isolation.
+    override func setUp() async throws {
         continueAfterFailure = false
         app = XCUIApplication()
         app.launchArguments = ["-uitest"]
