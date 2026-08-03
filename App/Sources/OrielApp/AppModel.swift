@@ -198,6 +198,59 @@ final class AppModel: ObservableObject {
         webView?.reload()
     }
 
+    /// The only way into Picture-in-Picture.
+    ///
+    /// §7.1 rates a user-tapped button as the one reliable mechanism, and the
+    /// gesture is why: `requestPictureInPicture()` outside genuine user
+    /// activation fails *silently*. This must stay wired to a real tap — never
+    /// to `visibilitychange`, a timer, or a navigation callback.
+    func enterPictureInPicture() {
+        guard let webView else {
+            return
+        }
+        webView.evaluateJavaScript("window.__inj.media.enterPiP()", in: nil, in: .page) {
+            [weak self] result in
+            guard let self else {
+                return
+            }
+            let outcome: String
+            switch result {
+            case .success(let value):
+                outcome = String(describing: value)
+            case .failure(let error):
+                outcome = "failed: \(error)"
+            }
+            // Surfaced rather than swallowed: "unsupported" and "no-media" are
+            // the two cases where the button legitimately does nothing, and a
+            // button that appears dead is the worst possible outcome.
+            if outcome != "requested" {
+                self.record(
+                    LogEntry(
+                        id: UUID(),
+                        at: Date(),
+                        scriptID: "pip",
+                        level: "warn",
+                        message: "Picture in Picture: \(outcome)"
+                    )
+                )
+            }
+        }
+    }
+
+    func mediaStateChanged(_ state: MediaState) {
+        media.setPlaying(state.playing)
+        if state.hasMedia, state.playing {
+            media.nowPlaying(
+                title: state.title,
+                duration: state.duration,
+                elapsed: state.currentTime,
+                rate: 1
+            )
+        } else if state.hasMedia == false {
+            media.clearNowPlaying()
+        }
+    }
+
     /// §6's "Run on current page now" — the feature that makes on-device
     /// authoring bearable, because the alternative is a reload per keystroke.
     ///

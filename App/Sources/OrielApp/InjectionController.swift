@@ -95,11 +95,9 @@ final class InjectionController {
             return
         }
         wiredWorlds.insert(world.rawValue)
-        contentController.add(
-            bridge,
-            contentWorld: contentWorld(for: world),
-            name: ScriptBridge.logHandlerName
-        )
+        let target = contentWorld(for: world)
+        contentController.add(bridge, contentWorld: target, name: ScriptBridge.logHandlerName)
+        contentController.add(bridge, contentWorld: target, name: ScriptBridge.mediaHandlerName)
     }
 
     private func contentWorld(for world: ScriptWorld) -> WKContentWorld {
