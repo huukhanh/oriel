@@ -39,14 +39,9 @@ struct WebViewContainer: UIViewRepresentable {
         webView.navigationDelegate = context.coordinator
 
         let storeBridge = ScriptStoreBridge(
-            read: { [weak model] scriptID, key in
-                model?.scriptValue(scriptID: scriptID, key: key)
-            },
-            write: { [weak model] scriptID, key, value in
+            initialValues: model.state.scriptValues,
+            persist: { [weak model] scriptID, key, value in
                 model?.setScriptValue(scriptID: scriptID, key: key, value: value)
-            },
-            list: { [weak model] scriptID in
-                model?.scriptValueKeys(scriptID: scriptID) ?? []
             }
         )
 

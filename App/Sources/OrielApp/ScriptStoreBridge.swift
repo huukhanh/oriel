@@ -6,32 +6,36 @@ import WebKit
 ///
 /// A separate handler type from `ScriptBridge` because it needs a *reply*:
 /// `WKScriptMessageHandlerWithReply` resolves a JavaScript promise, whereas the
-/// plain handler is fire-and-forget. Mixing the two on one object would mean one
-/// of the protocol methods silently never being called.
+/// plain handler is fire-and-forget. Registering one with the other's `add`
+/// overload compiles and then silently never delivers.
 ///
-/// Values are stored per script id, so two scripts using the key `"count"` do
-/// not collide — and deleting a script takes its data with it.
-/// `@MainActor`, like the other WebKit handler protocols. That matters here
-/// beyond tidiness: `replyHandler` is a non-`Sendable` closure, so hopping to
-/// another actor to call it is a data race the compiler rejects outright.
-@MainActor
-final class ScriptStoreBridge: NSObject, WKScriptMessageHandlerWithReply {
+/// **Nonisolated, and it owns its own data.** The protocol is nonisolated in the
+/// real SDK — unlike `WKNavigationDelegate`, which *is* `@MainActor` — and
+/// `replyHandler` is a non-`Sendable` closure, so it cannot be carried to the
+/// main actor to reach state that lives there. Rather than fight that, the
+/// bridge keeps a lock-guarded copy and answers synchronously; writes are
+/// mirrored to `AppModel` afterwards, with only `Sendable` strings crossing.
+///
+/// The side benefit is that a script reading a value never waits on the main
+/// actor — which is the thread rendering the page it is running in.
+final class ScriptStoreBridge: NSObject, WKScriptMessageHandlerWithReply, @unchecked Sendable {
 
     static let handlerName = "scriptStore"
 
-    /// Reads and writes run on the main actor, where `AppModel` owns the state.
-    private let read: @MainActor (String, String) -> String?
-    private let write: @MainActor (String, String, String?) -> Void
-    private let list: @MainActor (String) -> [String]
+    private let lock = NSLock()
+    /// script id → key → JSON-encoded value.
+    private var values: [String: [String: String]]
+
+    /// Called after a write so the durable store catches up. Fire-and-forget:
+    /// the reply has already gone back to JavaScript by then.
+    private let persist: @MainActor (String, String, String?) -> Void
 
     init(
-        read: @escaping @MainActor (String, String) -> String?,
-        write: @escaping @MainActor (String, String, String?) -> Void,
-        list: @escaping @MainActor (String) -> [String]
+        initialValues: [String: [String: String]],
+        persist: @escaping @MainActor (String, String, String?) -> Void
     ) {
-        self.read = read
-        self.write = write
-        self.list = list
+        self.values = initialValues
+        self.persist = persist
     }
 
     func userContentController(
@@ -52,17 +56,56 @@ final class ScriptStoreBridge: NSObject, WKScriptMessageHandlerWithReply {
 
         switch op {
         case "get":
-            replyHandler(read(scriptID, key), nil)
+            replyHandler(read(scriptID: scriptID, key: key), nil)
+
         case "set":
-            write(scriptID, key, value)
+            write(scriptID: scriptID, key: key, value: value)
             replyHandler(nil, nil)
+
         case "delete":
-            write(scriptID, key, nil)
+            write(scriptID: scriptID, key: key, value: nil)
             replyHandler(nil, nil)
+
         case "list":
-            replyHandler(list(scriptID), nil)
+            replyHandler(keys(scriptID: scriptID), nil)
+
         default:
             replyHandler(nil, "unknown storage op: \(op)")
+        }
+    }
+
+    // MARK: - storage
+
+    func read(scriptID: String, key: String) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return values[scriptID]?[key]
+    }
+
+    func keys(scriptID: String) -> [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return (values[scriptID].map { Array($0.keys) } ?? []).sorted()
+    }
+
+    func write(scriptID: String, key: String, value: String?) {
+        lock.lock()
+        var bucket = values[scriptID] ?? [:]
+        if let value {
+            bucket[key] = value
+        } else {
+            bucket.removeValue(forKey: key)
+        }
+        if bucket.isEmpty {
+            values.removeValue(forKey: scriptID)
+        } else {
+            values[scriptID] = bucket
+        }
+        lock.unlock()
+
+        let persist = self.persist
+        Task { @MainActor in
+            persist(scriptID, key, value)
         }
     }
 }

@@ -52,14 +52,25 @@ final class InjectionIntegrationTests: XCTestCase {
     }
 
     /// Builds the real thing: real controller, real factory, real wrapper.
-    /// Stands in for AppModel's persistence, so the storage round trip is
-    /// observable without a real store on disk.
+    /// Records what the bridge pushed through to durable storage.
     @MainActor
     final class FakeStore {
         var values: [String: [String: String]] = [:]
+
+        func apply(scriptID: String, key: String, value: String?) {
+            var bucket = values[scriptID] ?? [:]
+            if let value {
+                bucket[key] = value
+            } else {
+                bucket.removeValue(forKey: key)
+            }
+            values[scriptID] = bucket
+        }
     }
 
     private let store = FakeStore()
+    /// Seeded into the bridge, so a test can plant another script's data.
+    private var seededValues: [String: [String: String]] = [:]
 
     private func makeWebView(
         scripts: [Script],
@@ -70,18 +81,9 @@ final class InjectionIntegrationTests: XCTestCase {
         let bridge = ScriptBridge(onLog: onLog, onMedia: onMedia)
         let store = self.store
         let storeBridge = ScriptStoreBridge(
-            read: { scriptID, key in store.values[scriptID]?[key] },
-            write: { scriptID, key, value in
-                var bucket = store.values[scriptID] ?? [:]
-                if let value {
-                    bucket[key] = value
-                } else {
-                    bucket.removeValue(forKey: key)
-                }
-                store.values[scriptID] = bucket
-            },
-            list: { scriptID in
-                (store.values[scriptID].map { Array($0.keys) } ?? []).sorted()
+            initialValues: seededValues,
+            persist: { scriptID, key, value in
+                store.apply(scriptID: scriptID, key: key, value: value)
             }
         )
         let injection = InjectionController(
@@ -366,7 +368,7 @@ final class InjectionIntegrationTests: XCTestCase {
     }
 
     func testGMStorageIsScopedPerScript() async throws {
-        store.values["other"] = ["count": "999"]
+        seededValues["other"] = ["count": "999"]
         let received = Received()
         let webView = try makeWebView(
             scripts: [

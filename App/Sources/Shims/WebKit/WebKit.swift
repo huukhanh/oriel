@@ -78,7 +78,8 @@ public protocol WKScriptMessageHandler: AnyObject {
     )
 }
 
-@MainActor
+// NOT @MainActor — the real SDK's is nonisolated, unlike WKNavigationDelegate.
+// Discovered by the macOS build; the stub had it wrong.
 public protocol WKScriptMessageHandlerWithReply: AnyObject {
     func userContentController(
         _ userContentController: WKUserContentController,
