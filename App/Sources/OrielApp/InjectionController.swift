@@ -51,9 +51,19 @@ final class InjectionController {
         contentController.removeAllUserScripts()
 
         let enabled = scripts.filter { $0.isEnabled }
-        let worlds = Set(enabled.map { $0.metadata.world })
 
-        // The prelude must be first in every world that has scripts, because
+        // `.page` ALWAYS gets the runtime, even with no scripts enabled.
+        //
+        // The runtime is not only the script host — it owns the media bridge
+        // that the toolbar's PiP button calls into. Deriving the world list
+        // purely from enabled scripts meant that turning every script off also
+        // silently killed PiP and Now Playing, with `window.__inj` simply
+        // undefined. Nothing compiled differently and nothing logged; a
+        // simulator test is what caught it.
+        var worlds: Set<ScriptWorld> = [.page]
+        worlds.formUnion(enabled.map { $0.metadata.world })
+
+        // The prelude must come first in every world that has scripts, because
         // each wrapper's first act is to call `window.__inj.register`.
         for world in worlds.sorted(by: { $0.rawValue < $1.rawValue }) {
             wireBridgeIfNeeded(for: world)

@@ -1,5 +1,6 @@
 import AVFoundation
 import Core
+import MediaPlayer
 import Foundation
 import UIKit
 

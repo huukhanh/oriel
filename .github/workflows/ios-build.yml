@@ -1,0 +1,87 @@
+# The real compiler.
+#
+# This project is developed on a headless Linux box with no Xcode, and every
+# Apple API in App/ has until now been *asserted* — typechecked against stub
+# frameworks that encode what we believe the SDK looks like. A macOS runner has
+# the actual SDK, so this is the job that turns "compiles-unknown" into a fact.
+#
+# Builds for the simulator with signing off: the question here is whether the
+# code compiles and links against the real frameworks, not whether it can be
+# installed on a device.
+name: ios-build
+
+on: [pull_request, push]
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        working-directory: App
+        run: xcodegen generate
+
+      # Whatever the build says about our API assumptions is the point of this
+      # job, so surface it clearly rather than burying it in noise.
+      - name: Build (iOS Simulator)
+        working-directory: App
+        run: |
+          set +e
+          xcodebuild \
+            -project Oriel.xcodeproj \
+            -scheme Oriel \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            build > build.log 2>&1
+          status=$?
+          # The diagnostics are the product of this job. Piping xcodebuild
+          # through `tail` buries them under the copy-resource chatter that
+          # comes after the failure.
+          echo "───────── errors ─────────"
+          grep -E "error:" build.log | sort -u | head -60
+          echo "───────── warnings ───────"
+          grep -E "warning:" build.log | grep -v "Sources/Shims" | sort -u | head -30
+          echo "──────────────────────────"
+          exit $status
+
+      # Compiling settles the signatures. It does NOT settle content worlds or
+      # the message-handler bridge, which fail silently — the script runs and
+      # messageHandlers is just undefined. Only a running WKWebView shows that.
+      - name: Test (iOS Simulator)
+        working-directory: App
+        run: |
+          set +e
+          xcodebuild \
+            -project Oriel.xcodeproj \
+            -scheme Oriel \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            test > test.log 2>&1
+          status=$?
+          echo "───────── failures ─────────"
+          grep -E "error:|failed|XCTAssert" test.log | sort -u | head -60
+          echo "───────── summary ──────────"
+          grep -E "Test Suite .* (passed|failed)|Executed [0-9]+ test" test.log | tail -10
+          echo "────────────────────────────"
+          exit $status
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-logs
+          path: |
+            App/build.log
+            App/test.log
+          if-no-files-found: ignore

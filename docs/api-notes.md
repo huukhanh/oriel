@@ -1,60 +1,71 @@
 # API notes
 
 Signatures the compiler has actually accepted or rejected. Append after every
-build failure caused by a wrong guess. Read this before writing platform code —
-it is this project's substitute for having a compiler.
+build failure caused by a wrong guess. Read this before writing platform code.
 
-| Symbol | Correct form | Learned |
-|---|---|---|
+Since `ios-build.yml` landed, this file has a real source: a **macOS runner with
+the actual SDK** builds the app and runs simulator tests on every push. The
+"substitute for having a compiler" framing is retired — there is a compiler.
 
 ---
 
-## Unconfirmed assumptions
+## Confirmed by the real SDK
 
-`App/Sources/Shims/` is this list made executable. Those stub modules let the
-real app sources be typechecked on Linux in Swift 6 language mode — but a stub
-encodes what we *believe* an Apple API looks like, so **a green Linux build
-means "internally consistent", never "will compile in Xcode"**.
-
-Everything below is asserted, not verified. On the first real build, check these
-first; each is a single autocomplete lookup.
-
-### Highest risk — silent failure rather than a compile error
-
-| Symbol | Assumed | Why it matters |
-|---|---|---|
-| `WKUserContentController.add(_:contentWorld:name:)` | that label order, and that the world-taking overload exists | If the handler lands in a different world than the script, `window.webkit.messageHandlers.scriptLog` is `undefined` on the JS side. **Compiles fine, logs nothing.** |
-| `WKUserScript(source:injectionTime:forMainFrameOnly:in:)` | `in:` is the last parameter | Same class of failure — a script in the wrong world sees a different global object. |
-
-### Compile-time risk
-
-| Symbol | Assumed |
+| Symbol | Verdict |
 |---|---|
-| `WKNavigationDelegate` | is `@MainActor` in the iOS 18 SDK. `WebViewContainer.Coordinator` is annotated to match; if Xcode disagrees, change the **stub**, don't drop the annotation |
-| `UIViewRepresentable` | is `@MainActor` and refines `View` |
-| `WKWebView.evaluateJavaScript(_:in:in:completionHandler:)` | frame first, content world second |
-| `WKWebView.isInspectable` | exists on iOS 16.4+ (used under `#if DEBUG`) |
-| `WKWebsiteDataStore.default()` / `.nonPersistent()` | static methods, not properties |
-| `AVAudioSession.setCategory(_:mode:options:)` | throws; `.moviePlayback` is valid with `.playback` |
-| `AVAudioSession.setActive(_:options:)` | throws rather than returning `Bool` |
-| `MPNowPlayingInfoCenter.default()` | a static method |
-| `.onChange(of:) { old, new in }` | the two-parameter form (iOS 17+) |
-| `Section(_:content:)` | pins `Parent == Text, Footer == EmptyView` |
-| `TextEditor(text:)` | takes a plain `Binding<String>` |
+| `WKUserContentController.add(_:contentWorld:name:)` | ✅ correct — label order and overload both exist |
+| `WKUserScript(source:injectionTime:forMainFrameOnly:in:)` | ✅ correct — `in:` is last |
+| `WKWebView.evaluateJavaScript(_:in:in:completionHandler:)` | ✅ correct — frame, then content world |
+| `WKNavigationDelegate` is `@MainActor` | ✅ correct |
+| `UIViewRepresentable` is `@MainActor` and refines `View` | ✅ correct |
+| `WKWebsiteDataStore.default()` / `.nonPersistent()` | ✅ static methods |
+| `AVAudioSession.setCategory(_:mode:options:)` / `setActive(_:options:)` | ✅ both throw |
+| `webView.isInspectable` under `#if DEBUG` | ✅ compiles for iOS 18 |
+| `.onChange(of:) { old, new in }` | ✅ two-parameter form |
+| `Section(_:content:)`, `TextEditor(text:)`, `.swipeActions`, `ToolbarItem(placement: .bottomBar)` | ✅ all compile |
+| The whole app under `SWIFT_STRICT_CONCURRENCY: complete`, Swift 6 mode | ✅ zero errors, zero warnings |
 
-### Known stub inaccuracies
+**Verified at runtime on the simulator**, not merely compiled — these are the
+two that fail *silently* and no compiler could settle:
 
-Places where the Linux check is deliberately *laxer* than the SDK, so a real
-error could hide:
+| Behaviour | Verdict |
+|---|---|
+| the prelude reaches the `.page` world | ✅ `typeof window.__inj === "object"` |
+| a handler added with `contentWorld: .page` is visible to a script in that world | ✅ `GM_log` arrives on the Swift side |
+| the match guard keeps an off-match script from running | ✅ a youtube.com script does not run on example.com |
+| a disabled script is not injected at all | ✅ zero registered entries |
+| `visibility-spoof` installs its override in a real `WKWebView` | ✅ `document.hidden === false`, own property present |
 
-- **`smartQuotesType` is not addressed.** It is a `UITextView` property with no
-  `TextEditor` equivalent. §6 calls it critical: smart quotes silently replace
-  `"` with a curly quote that is not valid JavaScript, and the corruption is
-  invisible in the editor — the script just stops working.
-  `autocorrectionDisabled` and `textInputAutocapitalization(.never)` are
-  applied, but **this specific problem is unsolved** and needs a
-  `UIViewRepresentable` wrapper around `UITextView`.
-- Stub view modifiers all return one opaque type, so ordering mistakes that
-  real SwiftUI would reject by type are not caught here.
-- The stub will not reproduce SwiftUI's type-checker timeouts on large view
-  bodies.
+## Corrected by the real SDK
+
+| Symbol | Wrong assumption | Correct form | Learned |
+|---|---|---|---|
+| `MPNowPlayingInfoCenter`, `MPRemoteCommandCenter` | that they come with `AVFoundation` | **`import MediaPlayer`** — separate framework | first macOS build |
+| `evaluateJavaScript` result in a `CheckedContinuation` | that `Any` could cross the boundary | it is not `Sendable`; convert inside the closure | first simulator test build |
+
+## Found by running, not by compiling
+
+| Bug | Why nothing else caught it |
+|---|---|
+| The runtime was only injected into worlds derived from **enabled** scripts, so disabling every script left `window.__inj` undefined — killing the PiP button and Now Playing | Compiles identically. Logs nothing. Playwright has no `WKUserContentController` to model it with. Only a real `WKWebView` shows it. |
+
+---
+
+## Still unverified
+
+Needs real hardware; a simulator cannot answer any of these:
+
+- Whether PiP actually opens a window. `webkitSetPresentationMode` is exercised
+  through a stub in the WebKit suite and reports `no-media`/`unsupported`
+  honestly, but the real presentation path is untested.
+- Whether background audio survives lock and backgrounding
+  ([#1](https://github.com/huukhanh/oriel/issues/1)). Simulator media behaviour
+  does not reflect the device.
+- Now Playing on the lock screen, AirPlay, route changes, interruptions.
+
+### Known gap, unrelated to any API
+
+**`smartQuotesType` is not addressed.** §6 calls it critical: iOS may replace
+`"` with a curly quote that is not valid JavaScript, invisibly, in the script
+editor. `TextEditor` has no such property — solving it needs a `UITextView`
+wrapped in `UIViewRepresentable`.
