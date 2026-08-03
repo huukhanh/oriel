@@ -1,0 +1,25 @@
+# Linux-only checks. This does NOT build the iOS app — there is no macOS
+# runner here. A green check means Core and web logic pass; it says nothing
+# about whether App/ compiles.
+name: linux-checks
+on: [pull_request, push]
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    container: swift:6.1
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift build --package-path Core
+      - run: swift test --package-path Core
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 11 }
+      - uses: actions/setup-node@v4
+        with: { node-version: "24", cache: pnpm, cache-dependency-path: web/pnpm-lock.yaml }
+      - run: pnpm install --frozen-lockfile
+        working-directory: web
+      - run: pnpm test
+        working-directory: web
