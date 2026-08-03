@@ -31,6 +31,9 @@ two that fail *silently* and no compiler could settle:
 | Behaviour | Verdict |
 |---|---|
 | the prelude reaches the `.page` world | ✅ `typeof window.__inj === "object"` |
+| `GM_setValue`/`GM_getValue` round-trip through the reply handler | ✅ value written, read back, scoped per script |
+| the script editor disables smart quotes, dashes and insert/delete | ✅ asserted against a real `UITextView` |
+| the app launches and its screens present | ✅ 7 XCUITests |
 | a handler added with `contentWorld: .page` is visible to a script in that world | ✅ `GM_log` arrives on the Swift side |
 | the match guard keeps an off-match script from running | ✅ a youtube.com script does not run on example.com |
 | a disabled script is not injected at all | ✅ zero registered entries |
@@ -42,6 +45,9 @@ two that fail *silently* and no compiler could settle:
 |---|---|---|---|
 | `MPNowPlayingInfoCenter`, `MPRemoteCommandCenter` | that they come with `AVFoundation` | **`import MediaPlayer`** — separate framework | first macOS build |
 | `evaluateJavaScript` result in a `CheckedContinuation` | that `Any` could cross the boundary | it is not `Sendable`; convert inside the closure | first simulator test build |
+| `WKScriptMessageHandlerWithReply` isolation | that it is `@MainActor`, like `WKNavigationDelegate` | it is **not** — the delegates differ | GM storage build |
+| `WKScriptMessageHandlerWithReply` method shape | `(…, replyHandler: @escaping (Any?, String?) -> Void)` | Swift imports it as **`async -> (Any?, String?)`** | GM storage build |
+| `XCUIApplication` | usable from a synchronous `setUp()` | it is `@MainActor`; use `setUp() async throws` | UI test build |
 
 ## Found by running, not by compiling
 
