@@ -11,6 +11,8 @@ import XCTest
 /// Launched with `-uitest`, which starts on `about:blank`. Otherwise every test
 /// here would depend on the network and on YouTube's markup, and a failure
 /// would be indistinguishable from a real regression.
+/// `@MainActor` because `XCUIApplication` is, under Swift 6.
+@MainActor
 final class AppLaunchUITests: XCTestCase {
 
     private var app: XCUIApplication!
