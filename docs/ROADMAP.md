@@ -116,7 +116,16 @@ proves it parses and behaves. That seam is the highest-value test in Phase 1.
 
 ## Phase 2 — Shell
 
-**Status:** next, and **blocked on a device tester** · **Milestone:** `Phase 2`
+**Status:** ✅ **written and typechecked**, unbuilt · **Milestone:** `Phase 2`
+
+The app target exists (`App/`), and — unexpectedly — it is not blind. A Linux
+typecheck harness (`App/Package.swift` plus stub `SwiftUI`/`UIKit`/`WebKit`/
+`AVFoundation` modules) compiles the real app sources in **Swift 6 language
+mode**, so typos, type errors and actor-isolation mistakes are caught here.
+
+What that does *not* prove: the stubs encode what we believe Apple's APIs look
+like. `docs/api-notes.md` ranks those assumptions, and the two riskiest fail
+*silently* rather than at compile time.
 
 First phase with unverifiable code — and with no one building on a Mac, every
 PR from here lands in `main` only after someone confirms it compiles. Per the
