@@ -1,7 +1,12 @@
 # 003 — Minimum deployment target: iOS 18, persistence via SwiftData
 
 **Date:** 2026-08-03
-**Status:** accepted
+**Status:** accepted — but the **SwiftData half is superseded by
+[006](./006-codable-store-not-swiftdata.md)**. iOS 18 and Swift 6 stand;
+persistence is a Codable file store in `Core`, not SwiftData. The reasoning
+below (models as plain structs, push logic across the Core boundary) is what
+006 followed to its conclusion once it became clear no one could compile the
+persistence layer either.
 
 ## Decision
 
