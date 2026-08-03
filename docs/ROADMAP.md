@@ -29,7 +29,19 @@ hand-reviewable PRs. See the `linux-verification` and `blind-swift` skills.
 
 ## Phase 0 — Prove the premise
 
-**Status:** not started · **Milestone:** `Phase 0` · 1 issue, 1 throwaway PR
+**Status:** built, delivered, **unanswerable** · **Milestone:** `Phase 0`
+
+> The spike is built and handed off ([#1](https://github.com/huukhanh/oriel/issues/1),
+> [PR #3](https://github.com/huukhanh/oriel/pull/3)) but **no device tester is
+> available**, so it will not report. Per
+> [decision 004](./decisions/004-background-audio-unverified.md) the project
+> stops waiting: **Phase 4 is planned PiP-first**, and background audio is
+> treated as an enhancement that may not work rather than a foundation.
+> The PR stays open; if a device run ever happens, the answer is one afternoon
+> away and Phase 4 gets revisited.
+>
+> Phases 1–3 never depended on the answer. That was the point of front-loading
+> them, and they proceed unchanged.
 
 The brainstorm rates `UIBackgroundModes: audio` + `AVAudioSession(.playback)`
 as "⚠️ mostly, widely reported to be flaky" (§7.1) and moves on. That row is
@@ -51,10 +63,11 @@ Questions it must answer:
 - Does it differ between **simulator and real device**? It will. Only the
   device answer counts.
 
-**Exit criteria.** If background audio holds on device: Phase 4 is built around
-it and §7.3 visibility-spoofing becomes an enhancement. If it fails: **stop and
-re-plan** Phase 4 around the tap-to-PiP path (§7.1 row 1), which is the one
-mechanism rated reliable, and the app's pitch narrows to "PiP for any site".
+**Exit criteria (resolved by decision 004).** An unanswerable question and a
+failed answer have the same planning consequence — you cannot build
+load-bearing structure on either. So the "it fails" branch was taken: Phase 4
+is re-planned around tap-to-PiP, and the app's pitch narrows honestly to
+"PiP and scripting for any site".
 
 Nothing else starts until this reports back.
 
@@ -62,7 +75,7 @@ Nothing else starts until this reports back.
 
 ## Phase 1 — Verifiable core
 
-**Status:** blocked on Phase 0 · **Milestone:** `Phase 1`
+**Status:** in progress · **Milestone:** `Phase 1`
 
 The largest safe chunk of work in the project, and the only phase where agent
 effort can be spent freely — every failure is caught locally.
@@ -130,19 +143,37 @@ re-deriving them wrong is this project's main failure mode.
 
 ---
 
-## Phase 4 — Media *(provisional — scope set by Phase 0 and the missing §7.5+)*
+## Phase 4 — Media, PiP-first *(provisional — §7.5+ still missing)*
 
-**Status:** blocked · **Milestone:** `Phase 4`
+**Status:** blocked on Phase 3 · **Milestone:** `Phase 4`
 
-Known from §7.1 as it survives in the truncated file:
+Re-planned per [decision 004](./decisions/004-background-audio-unverified.md).
+Ordered by how reliable the mechanism is, so the app is useful even if
+everything below the line never works:
 
-- PiP button driven by a **real user gesture** — the one mechanism rated
-  reliable. Auto-PiP on backgrounding via JS silently fails and must not be
-  attempted.
-- `AVAudioSession` lifecycle + `UIBackgroundModes: audio`, scoped by Phase 0.
-- `document.hidden` / `visibilityState` spoofing as a built-in script — high
-  value and orthogonal to the above; fixes page-initiated pause.
-- Now Playing info, sleep timer, `isIdleTimerDisabled` while media plays.
+**Load-bearing (mechanisms that are known to work):**
+
+1. **PiP button driven by a real user tap.** §7.1 rates this ✅ reliable and it
+   is what a comparable shipped app uses. Every PiP entry routes through this
+   one button. Auto-PiP from `visibilitychange` fails *silently* and must not
+   be attempted or "fixed" later.
+2. **`document.hidden` / `visibilityState` spoofing**, shipped as a built-in
+   script. Promoted from enhancement to headline: it is ✅ high value,
+   *orthogonal* to the audio session, and fixes page-initiated pause — a real
+   failure that hits YouTube whether or not the media process survives.
+3. `isIdleTimerDisabled` while media plays, cleared on pause and teardown.
+
+**Opportunistic (ships, but nothing depends on it):**
+
+4. `AVAudioSession` lifecycle + `UIBackgroundModes: audio`. Cheap, required for
+   PiP audio to behave anyway, and works if the platform cooperates. No other
+   feature's correctness may depend on it.
+5. Now Playing info and remote commands — owned by `MediaCoordinator` in Swift,
+   fed by JS events over the bridge, never implemented in JS.
+6. Sleep timer.
+
+Native `AVPlayer` handoff (§7.5) is cut off mid-sentence in the source document
+and is not planned until the full text is available.
 
 Native `AVPlayer` handoff (§7.5) is cut off mid-sentence in the source document
 and is not planned until the full text is available.
