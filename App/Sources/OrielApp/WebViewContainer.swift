@@ -23,9 +23,14 @@ struct WebViewContainer: UIViewRepresentable {
     func makeUIView(context: UIViewRepresentableContext<WebViewContainer>) -> WKWebView {
         let contentController = WKUserContentController()
 
-        let bridge = ScriptBridge { [weak model] entry in
-            model?.record(entry)
-        }
+        let bridge = ScriptBridge(
+            onLog: { [weak model] entry in
+                model?.record(entry)
+            },
+            onMedia: { [weak model] state in
+                model?.mediaStateChanged(state)
+            }
+        )
 
         let webView = WebViewFactory.make(
             settings: model.state.settings,

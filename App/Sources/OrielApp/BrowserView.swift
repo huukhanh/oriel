@@ -69,16 +69,27 @@ struct BrowserView: View {
 
     private var toolbar: some View {
         HStack {
+            // Six items, evenly spread. Deliberately not six buttons separated
+            // by five Spacers: that is eleven children, and a ViewBuilder takes
+            // at most ten.
             Button(action: { model.goBack() }) {
                 Image(systemName: "chevron.backward")
+                    .frame(maxWidth: .infinity)
             }
             .disabled(model.canGoBack == false)
 
-            Spacer()
             Button(action: { model.reload() }) {
                 Image(systemName: "arrow.clockwise")
+                    .frame(maxWidth: .infinity)
             }
-            Spacer()
+
+            // PiP entry is this button and nothing else. §7.1: it needs real
+            // user activation, and every automated path fails silently.
+            Button(action: { model.enterPictureInPicture() }) {
+                Image(systemName: "pip.enter")
+                    .frame(maxWidth: .infinity)
+            }
+
             Button(action: { showingScripts = true }) {
                 // The count is the point: "3 scripts active here" is the fast
                 // path to switching one off when a site breaks.
@@ -86,17 +97,20 @@ struct BrowserView: View {
                     "\(model.scriptsForCurrentPage.count)",
                     systemImage: "curlybraces"
                 )
+                .frame(maxWidth: .infinity)
             }
-            Spacer()
+
             Button(action: { showingLog = true }) {
                 Image(systemName: "text.alignleft")
+                    .frame(maxWidth: .infinity)
             }
-            Spacer()
+
             Button(action: { showingSettings = true }) {
                 Image(systemName: "gearshape")
+                    .frame(maxWidth: .infinity)
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 12)
         .padding(.vertical, 10)
     }
 

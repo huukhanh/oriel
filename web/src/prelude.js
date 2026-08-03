@@ -295,14 +295,107 @@
         global.addEventListener("__inj:navigate", onNavigate);
     }
 
+    // ---- media -------------------------------------------------------
+    // Driven from Swift: the toolbar's PiP button calls enterPiP() from a real
+    // tap, which is the only way PiP works. Triggering it from a
+    // `visibilitychange` handler fails silently — the promise rejects, or
+    // webkitSetPresentationMode fires its event and no window ever appears.
+    // Do not "fix" that by automating it.
+
+    function pickMedia() {
+        var elements = global.document.querySelectorAll("video, audio");
+        var fallback = null;
+        for (var i = 0; i < elements.length; i++) {
+            var element = elements[i];
+            if (!element.paused && !element.ended) {
+                return element;
+            }
+            // Prefer the largest paused candidate: ad slots and hidden
+            // preview players are usually tiny, and picking one of those
+            // means the PiP button acts on the wrong video.
+            if (fallback === null || area(element) > area(fallback)) {
+                fallback = element;
+            }
+        }
+        return fallback;
+    }
+
+    function area(element) {
+        return (element.clientWidth || 0) * (element.clientHeight || 0);
+    }
+
+    function mediaState() {
+        var element = pickMedia();
+        if (!element) {
+            return { hasMedia: false, playing: false };
+        }
+        return {
+            hasMedia: true,
+            playing: !element.paused && !element.ended,
+            currentTime: isFinite(element.currentTime) ? element.currentTime : 0,
+            duration: isFinite(element.duration) ? element.duration : 0,
+            title: global.document.title || "",
+            isVideo: element.tagName === "VIDEO"
+        };
+    }
+
+    function enterPiP() {
+        var element = pickMedia();
+        if (!element) {
+            return "no-media";
+        }
+        // The WebKit-specific path is the one that works on iOS; the standard
+        // one is here for completeness and for testing in other engines.
+        if (typeof element.webkitSetPresentationMode === "function") {
+            try {
+                element.webkitSetPresentationMode("picture-in-picture");
+                return "requested";
+            } catch (error) {
+                return "failed:" + error;
+            }
+        }
+        if (typeof element.requestPictureInPicture === "function") {
+            try {
+                element.requestPictureInPicture();
+                return "requested";
+            } catch (error) {
+                return "failed:" + error;
+            }
+        }
+        return "unsupported";
+    }
+
+    function postMediaState() {
+        try {
+            global.webkit.messageHandlers.mediaState.postMessage(mediaState());
+        } catch (e) {
+            /* no bridge */
+        }
+    }
+
+    function installMediaWatcher() {
+        // Captured on document: media events do not bubble, so a listener on
+        // window without capture would never see them.
+        var events = ["play", "pause", "ended", "loadedmetadata"];
+        for (var i = 0; i < events.length; i++) {
+            global.document.addEventListener(events[i], postMediaState, true);
+        }
+    }
+
     global.__inj = {
         register: register,
         // Exposed for tests, and for the Swift side's "run on current page now".
         matches: matchesDescriptor,
         matchesAny: matchesAny,
         glob: glob,
+        media: {
+            enterPiP: enterPiP,
+            state: mediaState,
+            pick: pickMedia
+        },
         _entries: entries
     };
 
     installHistoryHooks();
+    installMediaWatcher();
 })(typeof window !== "undefined" ? window : this);
