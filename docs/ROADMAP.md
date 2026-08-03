@@ -75,7 +75,18 @@ Nothing else starts until this reports back.
 
 ## Phase 1 — Verifiable core
 
-**Status:** in progress · **Milestone:** `Phase 1`
+**Status:** ✅ complete · **Milestone:** `Phase 1` · #4 #5 #6 shipped
+
+Everything below landed with tests. Two notes on where it differs from the
+original plan:
+
+- **`Binding` was not built.** The §3 diagram has a type joining scripts to
+  sites, but a script's scope *is* its `@match` patterns — a binding table would
+  be a second, derived source of truth for the same fact, free to disagree with
+  the first. Scope lives in one place.
+- **Re-entry departs from the §5.2 sketch**, per
+  [decision 005](./decisions/005-spa-reentry.md). Scripts run once per *match*,
+  not once per route change.
 
 The largest safe chunk of work in the project, and the only phase where agent
 effort can be spent freely — every failure is caught locally.
@@ -105,10 +116,14 @@ proves it parses and behaves. That seam is the highest-value test in Phase 1.
 
 ## Phase 2 — Shell
 
-**Status:** blocked on Phase 1 · **Milestone:** `Phase 2`
+**Status:** next, and **blocked on a device tester** · **Milestone:** `Phase 2`
 
-First phase with unverifiable code. Small PRs from here on; each one is a guess
-until the user builds it.
+First phase with unverifiable code — and with no one building on a Mac, every
+PR from here lands in `main` only after someone confirms it compiles. Per the
+merge gate that is not a formality: unbuildable code in `main` is inherited by
+the next branch, and the failure then surfaces attached to the wrong change.
+
+Small PRs from here on; each one is a guess until built.
 
 - `WebViewFactory.make(settings:)` — the single place a `WKWebView` is born,
   with the §4.1 config flags.
