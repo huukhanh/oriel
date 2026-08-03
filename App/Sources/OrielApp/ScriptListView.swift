@@ -9,6 +9,7 @@ struct ScriptListView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var creatingNew = false
+    @State private var editingScriptID: String?
 
     var body: some View {
         NavigationStack {
@@ -42,27 +43,48 @@ struct ScriptListView: View {
             ScriptEditorView(scriptID: nil)
                 .environmentObject(model)
         }
+        .sheet(isPresented: editingBinding) {
+            ScriptEditorView(scriptID: editingScriptID)
+                .environmentObject(model)
+        }
+    }
+
+    private var editingBinding: Binding<Bool> {
+        Binding(
+            get: { editingScriptID != nil },
+            set: { presented in
+                if presented == false {
+                    editingScriptID = nil
+                }
+            }
+        )
     }
 
     private func row(for script: Script) -> some View {
         HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(script.name)
-                Text(ScriptListView.matchSummary(for: script))
-                    .font(.caption)
-                    .foregroundStyle(Color.secondary)
-                if script.metadata.warnings.isEmpty == false {
-                    Text("\(script.metadata.warnings.count) warnings")
+            Button(action: { open(script) }) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(script.name)
+                    Text(ScriptListView.matchSummary(for: script))
                         .font(.caption)
-                        .foregroundStyle(Color.orange)
+                        .foregroundStyle(Color.secondary)
+                    if script.metadata.warnings.isEmpty == false {
+                        Text("\(script.metadata.warnings.count) warnings")
+                            .font(.caption)
+                            .foregroundStyle(Color.orange)
+                    }
                 }
             }
+            .buttonStyle(.plain)
+
             Spacer()
+
             if script.origin == .builtIn {
                 Text("built-in")
                     .font(.caption)
                     .foregroundStyle(Color.secondary)
             }
+
             Toggle(
                 "",
                 isOn: Binding(
@@ -70,6 +92,24 @@ struct ScriptListView: View {
                     set: { model.setEnabled($0, forScriptID: script.id) }
                 )
             )
+        }
+        .swipeActions {
+            if script.origin == .user {
+                Button("Delete", role: .destructive) {
+                    model.deleteUserScript(id: script.id)
+                }
+            }
+        }
+    }
+
+    /// Tapping a built-in opens a *copy*, per decision 002 — bundle source is
+    /// read-only, and silently doing nothing on tap would be worse than either
+    /// editing it or refusing.
+    private func open(_ script: Script) {
+        if script.origin == .builtIn {
+            editingScriptID = model.duplicateForEditing(id: script.id)
+        } else {
+            editingScriptID = script.id
         }
     }
 

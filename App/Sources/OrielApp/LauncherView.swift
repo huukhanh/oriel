@@ -6,6 +6,10 @@ import SwiftUI
 struct LauncherView: View {
     @EnvironmentObject private var model: AppModel
 
+    /// Called after a bookmark is opened, so the sheet closes and the user is
+    /// looking at the page they just asked for.
+    let onOpen: () -> Void
+
     @State private var newTitle = ""
     @State private var newURL = ""
     @State private var adding = false
@@ -19,6 +23,12 @@ struct LauncherView: View {
                         Button(bookmark.title) {
                             if let url = URLNormalizer.url(from: bookmark.url) {
                                 model.load(url)
+                                onOpen()
+                            }
+                        }
+                        .swipeActions {
+                            Button("Delete", role: .destructive) {
+                                model.deleteBookmark(id: bookmark.id)
                             }
                         }
                     }
@@ -28,6 +38,18 @@ struct LauncherView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button("Add") { adding = true }
+                }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Add current page") {
+                        if let url = model.currentURL {
+                            model.addBookmark(
+                                title: model.pageTitle.isEmpty
+                                    ? url.absoluteString : model.pageTitle,
+                                url: url.absoluteString
+                            )
+                        }
+                    }
+                    .disabled(model.currentURL == nil)
                 }
             }
         }
