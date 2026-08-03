@@ -149,7 +149,14 @@ Small PRs from here on; each one is a guess until built.
 
 ## Phase 3 — Injection wiring
 
-**Status:** blocked on Phase 2 · **Milestone:** `Phase 3`
+**Status:** ✅ **written; the JavaScript half is proven in a real WebKit engine**
+· **Milestone:** `Phase 3`
+
+`web/webkit/` runs the injection engine in Playwright's WebKit — the same
+JavaScriptCore and WebCore that back `WKWebView`. That settles document-start
+timing, CSP behaviour, history interception and SPA re-entry. It says nothing
+about `WKUserContentController` or content worlds, which remain device
+questions and are the two riskiest entries in `docs/api-notes.md`.
 
 Where Phase 1's proven logic meets WebKit. Read the `webkit-injection` skill
 before touching any of it — these invariants are counter-intuitive and
@@ -169,7 +176,8 @@ re-deriving them wrong is this project's main failure mode.
 
 ## Phase 4 — Media, PiP-first *(provisional — §7.5+ still missing)*
 
-**Status:** blocked on Phase 3 · **Milestone:** `Phase 4`
+**Status:** load-bearing half ✅ **built**; opportunistic half written ·
+**Milestone:** `Phase 4`
 
 Re-planned per [decision 004](./decisions/004-background-audio-unverified.md).
 Ordered by how reliable the mechanism is, so the app is useful even if
@@ -213,7 +221,17 @@ and is not planned until the full text is available.
 
 ## Phase 5 — Authoring UX *(provisional)*
 
-**Status:** blocked · **Milestone:** `Phase 5`
+**Status:** core loop ✅ built · **Milestone:** `Phase 5`
+
+Built: the merged list with per-script toggles and match summaries, the editor
+with live metadata warnings, **"Run on this page now"**, duplicate-a-built-in,
+delete, and the bookmark launcher.
+
+Not built: import/export, the keyboard accessory row, drag-to-reorder, and —
+called out in `docs/api-notes.md` — **`smartQuotesType`**, which §6 flags as
+critical. `TextEditor` has no such property, so solving it needs a `UITextView`
+wrapper. Until then iOS may silently replace `"` with a curly quote that is not
+valid JavaScript.
 
 - Scripts list — built-ins and user scripts merged, drag to reorder (order =
   injection order), per-section grouping.
