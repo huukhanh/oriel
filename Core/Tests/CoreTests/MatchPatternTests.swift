@@ -21,6 +21,7 @@ final class MatchPatternTests: XCTestCase {
         }
         let cases: [Case]
         let invalidPatterns: [Invalid]
+        let descriptors: [String: MatchPatternDescriptor]
     }
 
     /// Located relative to this source file so both languages can read the same
@@ -54,6 +55,34 @@ final class MatchPatternTests: XCTestCase {
                 pattern.matches(testCase.url),
                 testCase.match,
                 "`\(testCase.pattern)` vs `\(testCase.url)` — \(testCase.why)"
+            )
+        }
+    }
+
+    /// The other half of the cross-language contract.
+    ///
+    /// The JavaScript guard never parses `@match` text — it consumes these
+    /// descriptors. Asserting Swift produces exactly the hand-written table the
+    /// JS suite reads is what makes "both sides agree" mechanically checkable
+    /// rather than a claim in a comment.
+    func testDescriptorsMatchTheSharedTable() throws {
+        let fixture = try Self.loadFixture()
+
+        for (patternText, expected) in fixture.descriptors {
+            let pattern = try MatchPattern(patternText)
+            XCTAssertEqual(
+                pattern.descriptor,
+                expected,
+                "`\(patternText)` parses differently in Swift than the table the JS guard reads"
+            )
+        }
+
+        // Every pattern exercised below must have a descriptor, or the two
+        // suites are quietly testing different sets of patterns.
+        for testCase in fixture.cases {
+            XCTAssertNotNil(
+                fixture.descriptors[testCase.pattern],
+                "`\(testCase.pattern)` has no descriptor entry"
             )
         }
     }
