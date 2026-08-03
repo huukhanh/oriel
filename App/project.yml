@@ -79,3 +79,28 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
         ENABLE_PREVIEWS: NO
+
+  # Runs on the simulator, against a real WKWebView. This is the only place
+  # content worlds and the message-handler bridge can be checked at all: get the
+  # world wrong and everything compiles, the script still runs, and
+  # messageHandlers.scriptLog is simply undefined. No compiler catches that.
+  OrielTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+      # The tests read the real prelude and built-ins, so they need their own
+      # copies — Bundle.main is the test bundle under a unit-test target.
+      - path: ../web/src/prelude.js
+        buildPhase: resources
+      - path: ../web/src/builtins/visibility-spoof.js
+        buildPhase: resources
+      - path: ../web/src/builtins/playsinline.js
+        buildPhase: resources
+    dependencies:
+      - target: Oriel
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.oriel.browser.tests
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: YES

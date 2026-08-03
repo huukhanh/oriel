@@ -54,10 +54,34 @@ jobs:
           echo "──────────────────────────"
           exit $status
 
-      - name: Upload full build log
+      # Compiling settles the signatures. It does NOT settle content worlds or
+      # the message-handler bridge, which fail silently — the script runs and
+      # messageHandlers is just undefined. Only a running WKWebView shows that.
+      - name: Test (iOS Simulator)
+        working-directory: App
+        run: |
+          set +e
+          xcodebuild \
+            -project Oriel.xcodeproj \
+            -scheme Oriel \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            test > test.log 2>&1
+          status=$?
+          echo "───────── failures ─────────"
+          grep -E "error:|failed|XCTAssert" test.log | sort -u | head -60
+          echo "───────── summary ──────────"
+          grep -E "Test Suite .* (passed|failed)|Executed [0-9]+ test" test.log | tail -10
+          echo "────────────────────────────"
+          exit $status
+
+      - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: xcodebuild-log
-          path: App/build.log
+          name: xcodebuild-logs
+          path: |
+            App/build.log
+            App/test.log
           if-no-files-found: ignore
