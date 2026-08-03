@@ -164,3 +164,17 @@ includes most sites worth scripting.
 So: no `eval(source)`, no `new Function(source)`, no injecting a `<script>` tag
 with inline source. A script that needs one of those will fail on exactly the
 sites the user cares about most.
+
+**This is measured, not assumed.** `web/webkit/engine.webkit.test.js` serves a
+page with `Content-Security-Policy: default-src 'none'; script-src 'none'` in a
+real WebKit engine and asserts three things:
+
+| Claim | Result |
+|---|---|
+| the page's own inline script is blocked | blocked — so the header is genuinely in effect |
+| an injected user script still runs | **runs** — user scripts are CSP-exempt |
+| `eval` / `new Function` inside that user script | **throw** — the exemption does not extend to them |
+| `GM_addStyle` under the same policy | works |
+
+Until that suite existed this was folklore in a comment. jsdom has no CSP
+implementation at all, so it could never have caught a design that violated it.
