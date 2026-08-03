@@ -35,11 +35,29 @@ jobs:
       - name: Build (iOS Simulator)
         working-directory: App
         run: |
-          set -o pipefail
+          set +e
           xcodebuild \
             -project Oriel.xcodeproj \
             -scheme Oriel \
             -destination 'platform=iOS Simulator,name=iPhone 16' \
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO \
-            build 2>&1 | tail -80
+            build > build.log 2>&1
+          status=$?
+          # The diagnostics are the product of this job. Piping xcodebuild
+          # through `tail` buries them under the copy-resource chatter that
+          # comes after the failure.
+          echo "───────── errors ─────────"
+          grep -E "error:" build.log | sort -u | head -60
+          echo "───────── warnings ───────"
+          grep -E "warning:" build.log | grep -v "Sources/Shims" | sort -u | head -30
+          echo "──────────────────────────"
+          exit $status
+
+      - name: Upload full build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: App/build.log
+          if-no-files-found: ignore

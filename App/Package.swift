@@ -32,6 +32,7 @@ let package = Package(
         .target(name: "UIKit", path: "Sources/Shims/UIKit"),
         .target(name: "WebKit", dependencies: ["UIKit"], path: "Sources/Shims/WebKit"),
         .target(name: "AVFoundation", path: "Sources/Shims/AVFoundation"),
+        .target(name: "MediaPlayer", path: "Sources/Shims/MediaPlayer"),
 
         // The real app sources, compiled unmodified.
         .target(
@@ -42,6 +43,7 @@ let package = Package(
                 "UIKit",
                 "WebKit",
                 "AVFoundation",
+                "MediaPlayer",
             ],
             path: "Sources/OrielApp",
             // Swift 6 language mode, matching what Xcode will build. Actor
