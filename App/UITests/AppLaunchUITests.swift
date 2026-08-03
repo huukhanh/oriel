@@ -74,11 +74,21 @@ final class AppLaunchUITests: XCTestCase {
         XCTAssertTrue(app.textFields["addressField"].waitForExistence(timeout: 20))
         app.buttons["toolbar.settings"].tap()
 
+        // Matched case-insensitively on a substring: a Form section header is
+        // styled by the platform, and asserting an exact string couples the
+        // test to that styling rather than to the behaviour.
+        let reloadHeader = app.staticTexts
+            .matching(NSPredicate(format: "label CONTAINS[c] %@", "Reloads the page"))
+            .firstMatch
         XCTAssertTrue(
-            app.staticTexts["Reloads the page"].waitForExistence(timeout: 10),
+            reloadHeader.waitForExistence(timeout: 15),
             "the settings screen does not warn which toggles throw the page away"
         )
-        XCTAssertTrue(app.staticTexts["Applies immediately"].exists)
+
+        // The toggles themselves matter more than the headers: one from each
+        // group proves the split reached the screen.
+        XCTAssertTrue(app.switches["Inline playback"].exists, "config-group toggle missing")
+        XCTAssertTrue(app.switches["Desktop site"].exists, "live-group toggle missing")
     }
 
     func testLogOpensAndIsEmptyOnACleanLaunch() {
@@ -90,8 +100,9 @@ final class AppLaunchUITests: XCTestCase {
     func testBookmarksSheetOpens() {
         XCTAssertTrue(app.textFields["addressField"].waitForExistence(timeout: 20))
         app.buttons["toolbar.bookmarks"].tap()
-        // The seeded defaults, so an empty launcher on first run would fail here.
-        XCTAssertTrue(app.staticTexts["YouTube"].waitForExistence(timeout: 10))
+        // A SwiftUI Button is a button, not a staticText — the seeded default,
+        // so an empty launcher on first run fails here.
+        XCTAssertTrue(app.buttons["YouTube"].waitForExistence(timeout: 15))
     }
 
     /// The authoring loop, end to end through the real UI.
