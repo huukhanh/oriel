@@ -2,7 +2,18 @@
 # runner here. A green check means Core and web logic pass; it says nothing
 # about whether App/ compiles.
 name: linux-checks
-on: [pull_request, push]
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Every push to a PR branch used to start a second, identical run - one for
+# `push` and one for `pull_request`. On the macOS runner that is 10x-billed
+# minutes spent proving the same thing twice. Superseded runs are also
+# cancelled: only the newest commit's result is worth paying for.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   core:
     runs-on: ubuntu-latest
