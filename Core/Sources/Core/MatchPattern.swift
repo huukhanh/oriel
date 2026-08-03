@@ -226,3 +226,45 @@ public struct MatchPattern: Hashable, Sendable, Codable {
 extension MatchPattern: CustomStringConvertible {
     public var description: String { source }
 }
+
+/// The wire form handed to the JavaScript route guard.
+///
+/// Patterns are parsed **once, in Swift**, and the JS side only evaluates the
+/// result. Shipping the raw `@match` text and parsing it again in JavaScript
+/// would mean two implementations of the security-critical part, and the two
+/// drifting apart is silent: a script simply starts running somewhere it
+/// shouldn't. Flattened deliberately — no associated values — so the JSON is
+/// trivial for JS to consume.
+public struct MatchPatternDescriptor: Hashable, Sendable, Codable {
+    /// `any` (http/https), `http`, or `https`.
+    public let scheme: String
+    /// `any`, `suffix` (domain or subdomain), or `exact`.
+    public let hostKind: String
+    /// Empty when `hostKind` is `any`.
+    public let host: String
+    public let path: String
+}
+
+extension MatchPattern {
+    public var descriptor: MatchPatternDescriptor {
+        let hostKind: String
+        let hostValue: String
+        switch host {
+        case .any:
+            hostKind = "any"
+            hostValue = ""
+        case .domainOrSubdomain(let domain):
+            hostKind = "suffix"
+            hostValue = domain
+        case .exact(let exact):
+            hostKind = "exact"
+            hostValue = exact
+        }
+        return MatchPatternDescriptor(
+            scheme: scheme.rawValue,
+            hostKind: hostKind,
+            host: hostValue,
+            path: path
+        )
+    }
+}

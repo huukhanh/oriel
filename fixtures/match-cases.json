@@ -9,6 +9,34 @@
     "that only exercises one language. This file is the cross-check."
   ],
 
+  "_descriptors_comment": [
+    "Hand-written expected parse of every pattern used below.",
+    "",
+    "Swift asserts its parser produces exactly these. JavaScript never parses",
+    "@match text at all -- it consumes these descriptors, because two",
+    "implementations of the security-critical parse would drift apart silently.",
+    "So this table is simultaneously Swift's expected output and JS's input,",
+    "which is what makes 'the two sides agree' mechanically checkable."
+  ],
+
+  "descriptors": {
+    "*://*.example.com/*": { "scheme": "any", "hostKind": "suffix", "host": "example.com", "path": "/*" },
+    "https://example.com/*": { "scheme": "https", "hostKind": "exact", "host": "example.com", "path": "/*" },
+    "https://youtube.com/watch*": { "scheme": "https", "hostKind": "exact", "host": "youtube.com", "path": "/watch*" },
+    "<all_urls>": { "scheme": "any", "hostKind": "any", "host": "", "path": "*" },
+    "*://*/*": { "scheme": "any", "hostKind": "any", "host": "", "path": "/*" },
+    "*://*.youtube.com/watch*": { "scheme": "any", "hostKind": "suffix", "host": "youtube.com", "path": "/watch*" },
+    "https://example.com/a": { "scheme": "https", "hostKind": "exact", "host": "example.com", "path": "/a" },
+    "https://example.com/": { "scheme": "https", "hostKind": "exact", "host": "example.com", "path": "/" },
+    "*://*.EXAMPLE.com/*": { "scheme": "any", "hostKind": "suffix", "host": "example.com", "path": "/*" },
+    "HTTPS://example.com/*": { "scheme": "https", "hostKind": "exact", "host": "example.com", "path": "/*" },
+    "http://example.com/*": { "scheme": "http", "hostKind": "exact", "host": "example.com", "path": "/*" },
+    "https://example.com/a+b": { "scheme": "https", "hostKind": "exact", "host": "example.com", "path": "/a+b" },
+    "https://example.com/a.b": { "scheme": "https", "hostKind": "exact", "host": "example.com", "path": "/a.b" },
+    "*://*.example.com/p/*/q": { "scheme": "any", "hostKind": "suffix", "host": "example.com", "path": "/p/*/q" },
+    "https://example.com/*/*": { "scheme": "https", "hostKind": "exact", "host": "example.com", "path": "/*/*" }
+  },
+
   "cases": [
     { "pattern": "*://*.example.com/*", "url": "https://example.com/", "match": true,
       "why": "*. matches the bare domain, not only subdomains" },
