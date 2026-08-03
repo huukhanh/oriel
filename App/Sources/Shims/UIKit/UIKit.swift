@@ -51,3 +51,97 @@ public final class UIImpactFeedbackGenerator {
     public func impactOccurred() {}
     public func prepare() {}
 }
+
+// MARK: - Text input
+
+public enum UITextAutocorrectionType: Int, Sendable {
+    case `default` = 0
+    case no = 1
+    case yes = 2
+}
+
+public enum UITextAutocapitalizationType: Int, Sendable {
+    case none = 0
+    case words = 1
+    case sentences = 2
+    case allCharacters = 3
+}
+
+public enum UITextSpellCheckingType: Int, Sendable {
+    case `default` = 0
+    case no = 1
+    case yes = 2
+}
+
+/// The whole reason `UITextView` is in this app: these three properties have no
+/// SwiftUI equivalent, and without them iOS silently rewrites `"` into a curly
+/// quote that is not valid JavaScript.
+public enum UITextSmartQuotesType: Int, Sendable {
+    case `default` = 0
+    case no = 1
+    case yes = 2
+}
+
+public enum UITextSmartDashesType: Int, Sendable {
+    case `default` = 0
+    case no = 1
+    case yes = 2
+}
+
+public enum UITextSmartInsertDeleteType: Int, Sendable {
+    case `default` = 0
+    case no = 1
+    case yes = 2
+}
+
+public struct UIFont: Sendable {
+    public static func monospacedSystemFont(ofSize: CGFloat, weight: Weight) -> UIFont {
+        UIFont()
+    }
+    public struct Weight: Sendable {
+        public static let regular = Weight()
+        public static let medium = Weight()
+    }
+}
+
+public struct UIEdgeInsets: Sendable {
+    public var top: CGFloat
+    public var left: CGFloat
+    public var bottom: CGFloat
+    public var right: CGFloat
+    public init(top: CGFloat, left: CGFloat, bottom: CGFloat, right: CGFloat) {
+        self.top = top
+        self.left = left
+        self.bottom = bottom
+        self.right = right
+    }
+}
+
+@MainActor
+open class UITextView: UIScrollView {
+    public var text: String = ""
+    public var font: UIFont?
+    public var textColor: UIColor?
+    public var isEditable: Bool = true
+    public var autocorrectionType: UITextAutocorrectionType = .default
+    public var autocapitalizationType: UITextAutocapitalizationType = .sentences
+    public var spellCheckingType: UITextSpellCheckingType = .default
+    public var smartQuotesType: UITextSmartQuotesType = .default
+    public var smartDashesType: UITextSmartDashesType = .default
+    public var smartInsertDeleteType: UITextSmartInsertDeleteType = .default
+    public var textContainerInset: UIEdgeInsets = UIEdgeInsets(
+        top: 0, left: 0, bottom: 0, right: 0
+    )
+    public var inputAccessoryView: UIView?
+    public weak var delegate: UITextViewDelegate?
+    public func insertText(_ text: String) {}
+}
+
+@MainActor
+public protocol UITextViewDelegate: AnyObject {
+    func textViewDidChange(_ textView: UITextView)
+}
+
+extension UITextViewDelegate {
+    public func textViewDidChange(_ textView: UITextView) {}
+}
