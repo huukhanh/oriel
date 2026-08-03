@@ -23,3 +23,24 @@ jobs:
         working-directory: web
       - run: pnpm test
         working-directory: web
+
+  # The injection engine in a real browser engine. Playwright's WebKit is the
+  # WPE/GTK port — same JavaScriptCore and WebCore as WKWebView on iOS. It says
+  # nothing about content worlds or media, but it settles injection timing, CSP
+  # and history interception, which jsdom cannot model at all.
+  webkit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 11 }
+      - uses: actions/setup-node@v4
+        with: { node-version: "24", cache: pnpm, cache-dependency-path: web/pnpm-lock.yaml }
+      - run: pnpm install --frozen-lockfile
+        working-directory: web
+      # Runners have root, so the whole local-prefix dance in
+      # scripts/setup-webkit-linux.sh collapses to this one line.
+      - run: pnpm exec playwright install --with-deps webkit
+        working-directory: web
+      - run: pnpm test:webkit
+        working-directory: web
