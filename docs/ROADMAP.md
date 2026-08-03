@@ -118,14 +118,13 @@ proves it parses and behaves. That seam is the highest-value test in Phase 1.
 
 **Status:** ✅ **written and typechecked**, unbuilt · **Milestone:** `Phase 2`
 
-The app target exists (`App/`), and — unexpectedly — it is not blind. A Linux
-typecheck harness (`App/Package.swift` plus stub `SwiftUI`/`UIKit`/`WebKit`/
-`AVFoundation` modules) compiles the real app sources in **Swift 6 language
-mode**, so typos, type errors and actor-isolation mistakes are caught here.
+**It builds, and it runs.** A macOS CI job compiles the app against the real
+iOS SDK in Swift 6 mode with strict concurrency (zero errors, zero warnings) and
+runs XCUITests that launch it in the simulator.
 
-What that does *not* prove: the stubs encode what we believe Apple's APIs look
-like. `docs/api-notes.md` ranks those assumptions, and the two riskiest fail
-*silently* rather than at compile time.
+The Linux stub harness (`App/Package.swift`) is still there and still useful as
+a fast local check, but it is no longer the last word — `docs/api-notes.md`
+records what the real SDK confirmed, corrected, and exposed.
 
 First phase with unverifiable code — and with no one building on a Mac, every
 PR from here lands in `main` only after someone confirms it compiles. Per the
@@ -153,10 +152,15 @@ Small PRs from here on; each one is a guess until built.
 · **Milestone:** `Phase 3`
 
 `web/webkit/` runs the injection engine in Playwright's WebKit — the same
-JavaScriptCore and WebCore that back `WKWebView`. That settles document-start
-timing, CSP behaviour, history interception and SPA re-entry. It says nothing
-about `WKUserContentController` or content worlds, which remain device
-questions and are the two riskiest entries in `docs/api-notes.md`.
+JavaScriptCore and WebCore that back `WKWebView` — settling document-start
+timing, CSP behaviour, history interception and SPA re-entry.
+
+**Content worlds and the message-handler bridge are now proven too**, by
+simulator tests against a real `WKWebView` (`App/Tests/`). Those were the two
+riskiest entries in `docs/api-notes.md` because they fail *silently*; they are
+verified rather than assumed, and the same suite caught a real bug — the runtime
+was only injected into worlds derived from *enabled* scripts, so disabling
+everything killed the PiP button.
 
 Where Phase 1's proven logic meets WebKit. Read the `webkit-injection` skill
 before touching any of it — these invariants are counter-intuitive and

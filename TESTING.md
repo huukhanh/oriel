@@ -9,22 +9,23 @@ internally consistent, not that Apple's signatures match what it assumes.
 
 ---
 
-## 1. What is already proven, and what is not
+## 1. What is proven, and what is not
 
-Being precise about this saves build cycles.
+Being precise about this saves build cycles. **Every row below except the last
+is checked automatically on every push** — `linux-checks.yml` and
+`ios-build.yml`.
 
 | Layer | Status | How |
 |---|---|---|
-| `@match` matching, metadata parsing, wrapper generation, settings-rebuild logic, the store, URL normalisation | **proven** | `swift test --package-path Core` — 86 tests on Linux |
-| Injection runtime, SPA re-entry, CSP behaviour, `visibility-spoof`, `playsinline` | **proven in a real WebKit engine** | `pnpm test:webkit` — Playwright's WebKit is the same JavaScriptCore/WebCore as `WKWebView` |
-| The app's Swift: SwiftUI views, `WKWebView` wiring, `AVAudioSession` | **compiles-unknown** | typechecked on Linux against *stub* frameworks, in Swift 6 language mode |
-| PiP, background audio, lock-screen behaviour, real device performance | **unverified** | needs hardware; see §4 |
+| `@match` matching, metadata parsing, wrapper generation, settings-rebuild logic, the store, URL normalisation | **proven** | 86 Linux tests |
+| Injection runtime, SPA re-entry, CSP behaviour, `visibility-spoof`, `playsinline`, the media bridge | **proven in a real WebKit engine** | 31 Playwright/WebKit tests |
+| **The app compiles** against the real iOS SDK, Swift 6 mode, strict concurrency | **proven** | macOS runner, `xcodebuild build` |
+| **Content worlds and the message-handler bridge** | **proven at runtime** | 7 simulator tests against a real `WKWebView` |
+| **The app launches and its screens work** | **proven** | 7 XCUITests driving the real app |
+| PiP actually opening a window, background audio, lock screen, AirPlay | **unverified** | needs hardware — §6 |
 
-The third row is the important one. `swift build --package-path App` passing
-means no typos, no type errors, no actor-isolation mistakes — it does **not**
-mean Xcode will accept it, because the stubs encode assumptions.
-
----
+The last row is the only one left. Everything above it is machine-checked, so
+if you are chasing a bug, start by assuming those layers are fine.
 
 ## 2. Setup
 
@@ -93,10 +94,9 @@ xcodebuild -project Oriel.xcodeproj -scheme Oriel \
 > let the app sources compile on a machine with no Xcode. Do not open it in
 > Xcode and do not add it as a package dependency.
 
-**If it fails to build, that is expected information, not a setback.** Paste the
-**first** error verbatim. `docs/api-notes.md` ranks the assumptions most likely
-to be wrong; the two at the top of that list fail *silently* rather than at
-compile time, so they are worth checking even on a successful build.
+The same build runs in CI on every push, so it should not surprise you. If it
+fails locally but passes in CI, the difference is your Xcode version or signing,
+not the code.
 
 ---
 

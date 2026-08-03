@@ -30,6 +30,22 @@ jobs:
         working-directory: App
         run: xcodegen generate
 
+      # Runner images change their installed simulators without notice, and a
+      # hardcoded device name turns that into a red build that looks like a code
+      # regression. Pick whatever iPhone this image actually has.
+      - name: Pick a simulator
+        id: sim
+        run: |
+          name=$(xcrun simctl list devices available -j \
+            | jq -r '[.devices[][] | select(.name | startswith("iPhone"))] | last | .name')
+          if [ -z "$name" ] || [ "$name" = "null" ]; then
+            echo "no iPhone simulator available on this image"
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "Using $name"
+          echo "device=$name" >> "$GITHUB_OUTPUT"
+
       # Whatever the build says about our API assumptions is the point of this
       # job, so surface it clearly rather than burying it in noise.
       - name: Build (iOS Simulator)
@@ -39,7 +55,7 @@ jobs:
           xcodebuild \
             -project Oriel.xcodeproj \
             -scheme Oriel \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO \
             build > build.log 2>&1
@@ -64,7 +80,7 @@ jobs:
           xcodebuild \
             -project Oriel.xcodeproj \
             -scheme Oriel \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO \
             test > test.log 2>&1

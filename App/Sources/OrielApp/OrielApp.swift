@@ -14,7 +14,17 @@ struct OrielApp: App {
         }
     }
 
-    private static let startURL = URL(string: "https://m.youtube.com/")
+    /// UI tests pass `-uitest`, which starts on a blank page.
+    ///
+    /// Without it every UI test would depend on the network and on YouTube's
+    /// markup — two things that can fail for reasons having nothing to do with
+    /// this app, in a runner with no obvious way to tell the difference.
+    private static var startURL: URL? {
+        if ProcessInfo.processInfo.arguments.contains("-uitest") {
+            return URL(string: "about:blank")
+        }
+        return URL(string: "https://m.youtube.com/")
+    }
 
     @MainActor
     private static func makeModel() -> AppModel {
