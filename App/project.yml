@@ -104,3 +104,18 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.oriel.browser.tests
         SWIFT_VERSION: "6.0"
         GENERATE_INFOPLIST_FILE: YES
+
+  # Does the app actually run? Compiling and unit-testing the injection layer
+  # says nothing about whether SwiftUI presents any of it.
+  OrielUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: Oriel
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.oriel.browser.uitests
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: YES

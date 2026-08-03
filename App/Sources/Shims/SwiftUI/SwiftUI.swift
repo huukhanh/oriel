@@ -669,6 +669,8 @@ extension View {
         _ action: @escaping (V, V) -> Void
     ) -> some View { _Stub() }
     public func onSubmit(_ action: @escaping () -> Void) -> some View { _Stub() }
+    public func accessibilityIdentifier(_ identifier: String) -> some View { _Stub() }
+    public func accessibilityLabel(_ label: String) -> some View { _Stub() }
     public func environmentObject<T: ObservableObject>(_ object: T) -> some View { _Stub() }
     public func environment<V>(_ keyPath: WritableKeyPath<EnvironmentValues, V>, _ value: V)
         -> some View

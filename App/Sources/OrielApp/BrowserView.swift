@@ -47,6 +47,7 @@ struct BrowserView: View {
     private var addressBar: some View {
         HStack(spacing: 8) {
             TextField("Address", text: $addressText)
+                .accessibilityIdentifier("addressField")
                 .textFieldStyle(.roundedBorder)
                 .autocorrectionDisabled(true)
                 .textInputAutocapitalization(.never)
@@ -81,12 +82,14 @@ struct BrowserView: View {
                 Image(systemName: "chevron.backward")
                     .frame(maxWidth: .infinity)
             }
+            .accessibilityIdentifier("toolbar.back")
             .disabled(model.canGoBack == false)
 
             Button(action: { model.reload() }) {
                 Image(systemName: "arrow.clockwise")
                     .frame(maxWidth: .infinity)
             }
+            .accessibilityIdentifier("toolbar.reload")
 
             // PiP entry is this button and nothing else. §7.1: it needs real
             // user activation, and every automated path fails silently.
@@ -94,6 +97,7 @@ struct BrowserView: View {
                 Image(systemName: "pip.enter")
                     .frame(maxWidth: .infinity)
             }
+            .accessibilityIdentifier("toolbar.pip")
 
             Button(action: { showingScripts = true }) {
                 // The count is the point: "3 scripts active here" is the fast
@@ -104,21 +108,25 @@ struct BrowserView: View {
                 )
                 .frame(maxWidth: .infinity)
             }
+            .accessibilityIdentifier("toolbar.scripts")
 
             Button(action: { showingLog = true }) {
                 Image(systemName: "text.alignleft")
                     .frame(maxWidth: .infinity)
             }
+            .accessibilityIdentifier("toolbar.log")
 
             Button(action: { showingLauncher = true }) {
                 Image(systemName: "square.grid.2x2")
                     .frame(maxWidth: .infinity)
             }
+            .accessibilityIdentifier("toolbar.bookmarks")
 
             Button(action: { showingSettings = true }) {
                 Image(systemName: "gearshape")
                     .frame(maxWidth: .infinity)
             }
+            .accessibilityIdentifier("toolbar.settings")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
