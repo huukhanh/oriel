@@ -172,11 +172,18 @@ everything below the line never works:
    is what a comparable shipped app uses. Every PiP entry routes through this
    one button. Auto-PiP from `visibilitychange` fails *silently* and must not
    be attempted or "fixed" later.
-2. **`document.hidden` / `visibilityState` spoofing**, shipped as a built-in
-   script. Promoted from enhancement to headline: it is ✅ high value,
-   *orthogonal* to the audio session, and fixes page-initiated pause — a real
-   failure that hits YouTube whether or not the media process survives.
+2. **`document.hidden` / `visibilityState` spoofing** — ✅ **built and proven in
+   real WebKit** (`web/src/builtins/visibility-spoof.js`). Promoted from
+   enhancement to headline: it is *orthogonal* to the audio session, and fixes
+   page-initiated pause — a real failure that hits YouTube whether or not the
+   media process survives. The Swift half (a settings toggle that enables it) is
+   all that remains.
 3. `isIdleTimerDisabled` while media plays, cleared on pause and teardown.
+
+**Already delivered, JS half proven:** `visibility-spoof` and `playsinline` are
+written, wrapped by the real generator, and verified in a real WebKit engine
+(`web/webkit/builtins.webkit.test.js`) — including that switching one off
+restores the page exactly. They need only a toggle to reach the user.
 
 **Opportunistic (ships, but nothing depends on it):**
 
