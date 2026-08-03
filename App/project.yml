@@ -1,0 +1,81 @@
+# The real iOS app. Generated with XcodeGen; no .xcodeproj is checked in,
+# because hand-authoring project.pbxproj on a machine with no Xcode corrupts it
+# in ways that are slow and confusing to diagnose.
+#
+#   brew install xcodegen
+#   cd App && xcodegen generate && open Oriel.xcodeproj
+#
+# NOTE: App/Package.swift in this same directory is NOT part of the app. It is
+# the Linux typecheck harness (stub SwiftUI/UIKit/WebKit/AVFoundation modules)
+# and is deliberately not referenced here — Xcode compiles Sources/OrielApp
+# against the real SDK.
+name: Oriel
+
+options:
+  bundleIdPrefix: com.oriel
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+
+packages:
+  Core:
+    path: ../Core
+
+targets:
+  Oriel:
+    type: application
+    platform: iOS
+
+    sources:
+      - path: Sources/OrielApp
+
+      # The injection runtime and the built-in scripts, copied into the bundle.
+      # Declared file-by-file with an explicit buildPhase rather than relying on
+      # extension defaults: if any of these silently misses the resources phase,
+      # the app launches, looks fine, and no user script runs at all.
+      #
+      # They live under web/ because that is where they are tested — the JS is
+      # verified in a real WebKit engine before it ever reaches a bundle.
+      - path: ../web/src/prelude.js
+        buildPhase: resources
+      - path: ../web/src/builtins/visibility-spoof.js
+        buildPhase: resources
+      - path: ../web/src/builtins/playsinline.js
+        buildPhase: resources
+
+    dependencies:
+      - package: Core
+        product: Core
+
+    info:
+      path: Sources/Info.plist
+      properties:
+        # Half of the background-audio mechanism; the other half is
+        # AVAudioSession(.playback) in MediaCoordinator. Either alone does
+        # nothing. See docs/decisions/004-background-audio-unverified.md — this
+        # is opportunistic, and nothing else depends on it working.
+        UIBackgroundModes:
+          - audio
+        UILaunchScreen: {}
+        UIRequiredDeviceCapabilities:
+          - arm64
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        # No ATS exceptions: this browser loads https. A site that needs
+        # cleartext is a site this app does not need to open.
+        CFBundleDisplayName: Oriel
+
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.oriel.browser
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        # Matches the Linux typecheck harness, which builds these same sources
+        # in Swift 6 language mode.
+        SWIFT_VERSION: "6.0"
+        SWIFT_STRICT_CONCURRENCY: complete
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_PREVIEWS: NO

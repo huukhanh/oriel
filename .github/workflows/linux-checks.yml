@@ -11,6 +11,11 @@ jobs:
       - uses: actions/checkout@v4
       - run: swift build --package-path Core
       - run: swift test --package-path Core
+      # Typechecks the real app sources against stub SwiftUI/UIKit/WebKit/
+      # AVFoundation modules, in Swift 6 language mode. NOT a substitute for
+      # building in Xcode — a stub encodes what we believe an Apple API looks
+      # like — but it catches every error that has nothing to do with Apple.
+      - run: swift build --package-path App
   web:
     runs-on: ubuntu-latest
     steps:
