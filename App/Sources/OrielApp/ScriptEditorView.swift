@@ -23,14 +23,11 @@ struct ScriptEditorView: View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 0) {
                 warnings
-                TextEditor(text: $source)
-                    .font(.system(.body, design: .monospaced))
-                    // All four matter. Smart quotes are the dangerous one:
-                    // they replace " with a curly quote that is not valid
-                    // JavaScript, and the corruption is invisible in the
-                    // editor — the script simply stops working.
-                    .autocorrectionDisabled(true)
-                    .textInputAutocapitalization(.never)
+                // A UITextView, not TextEditor: `smartQuotesType` has no
+                // SwiftUI equivalent, and it is the one that silently corrupts
+                // source. See CodeEditor.
+                CodeEditor(text: $source)
+                    .accessibilityIdentifier("sourceEditor")
             }
             .navigationTitle(metadata.name ?? "New script")
             .navigationBarTitleDisplayMode(.inline)
