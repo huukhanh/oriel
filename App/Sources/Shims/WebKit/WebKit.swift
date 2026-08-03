@@ -78,14 +78,14 @@ public protocol WKScriptMessageHandler: AnyObject {
     )
 }
 
-// NOT @MainActor — the real SDK's is nonisolated, unlike WKNavigationDelegate.
-// Discovered by the macOS build; the stub had it wrong.
+// Swift imports the Objective-C reply-handler method as `async` returning a
+// tuple, not as a completion closure. The stub had the ObjC shape; the real SDK
+// rejected it with "candidate has non-matching type".
 public protocol WKScriptMessageHandlerWithReply: AnyObject {
     func userContentController(
         _ userContentController: WKUserContentController,
-        didReceive message: WKScriptMessage,
-        replyHandler: @escaping (Any?, String?) -> Void
-    )
+        didReceive message: WKScriptMessage
+    ) async -> (Any?, String?)
 }
 
 public final class WKScriptMessage {

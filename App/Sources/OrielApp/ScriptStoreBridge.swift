@@ -38,17 +38,22 @@ final class ScriptStoreBridge: NSObject, WKScriptMessageHandlerWithReply, @unche
         self.persist = persist
     }
 
+    /// `async` returning a tuple, which is how Swift imports the
+    /// reply-handler method — not a completion closure. `nil` in the second
+    /// slot means success; a string there rejects the JavaScript promise.
+    ///
+    /// Left nonisolated: a nonisolated witness satisfies the requirement
+    /// whichever way the SDK annotates it, and the lock above means no
+    /// main-actor state is needed to answer.
     func userContentController(
         _ userContentController: WKUserContentController,
-        didReceive message: WKScriptMessage,
-        replyHandler: @escaping (Any?, String?) -> Void
-    ) {
+        didReceive message: WKScriptMessage
+    ) async -> (Any?, String?) {
         guard let body = message.body as? [String: Any],
             let op = body["op"] as? String,
             let scriptID = body["script"] as? String
         else {
-            replyHandler(nil, "malformed storage request")
-            return
+            return (nil, "malformed storage request")
         }
 
         let key = body["key"] as? String ?? ""
@@ -56,21 +61,17 @@ final class ScriptStoreBridge: NSObject, WKScriptMessageHandlerWithReply, @unche
 
         switch op {
         case "get":
-            replyHandler(read(scriptID: scriptID, key: key), nil)
-
+            return (read(scriptID: scriptID, key: key), nil)
         case "set":
             write(scriptID: scriptID, key: key, value: value)
-            replyHandler(nil, nil)
-
+            return (nil, nil)
         case "delete":
             write(scriptID: scriptID, key: key, value: nil)
-            replyHandler(nil, nil)
-
+            return (nil, nil)
         case "list":
-            replyHandler(keys(scriptID: scriptID), nil)
-
+            return (keys(scriptID: scriptID), nil)
         default:
-            replyHandler(nil, "unknown storage op: \(op)")
+            return (nil, "unknown storage op: \(op)")
         }
     }
 
