@@ -152,12 +152,16 @@ extension UITextViewDelegate {
 // Objective-C runtime type that does not exist on Linux, so `#selector` would
 // make the app unbuildable here. It is also the better modern API.
 
+/// The handler takes the action itself — `UIActionHandler` is
+/// `(UIAction) -> Void`, not `() -> Void`. The real SDK caught the zero-argument
+/// version with "contextual type for closure argument list expects 1 argument".
 public struct UIAction: Sendable {
-    public let handler: @MainActor @Sendable () -> Void
-    public init(handler: @escaping @MainActor @Sendable () -> Void) {
+    public typealias Handler = @MainActor @Sendable (UIAction) -> Void
+    public let handler: Handler
+    public init(handler: @escaping Handler) {
         self.handler = handler
     }
-    public init(title: String, handler: @escaping @MainActor @Sendable () -> Void) {
+    public init(title: String, handler: @escaping Handler) {
         self.handler = handler
     }
 }

@@ -48,6 +48,7 @@ two that fail *silently* and no compiler could settle:
 | `WKScriptMessageHandlerWithReply` isolation | that it is `@MainActor`, like `WKNavigationDelegate` | it is **not** — the delegates differ | GM storage build |
 | `WKScriptMessageHandlerWithReply` method shape | `(…, replyHandler: @escaping (Any?, String?) -> Void)` | Swift imports it as **`async -> (Any?, String?)`** | GM storage build |
 | `XCUIApplication` | usable from a synchronous `setUp()` | it is `@MainActor`; use `setUp() async throws` | UI test build |
+| `UIAction` handler | `() -> Void` | `UIActionHandler` is **`(UIAction) -> Void`** | accessory row build |
 
 ## Found by running, not by compiling
 

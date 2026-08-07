@@ -81,7 +81,7 @@ struct CodeEditor: UIViewRepresentable {
                 let button = UIButton(type: .system)
                 button.setTitle(key, for: .normal)
                 button.addAction(
-                    UIAction { [weak textView] in
+                    UIAction { [weak textView] _ in
                         guard let textView else {
                             return
                         }
