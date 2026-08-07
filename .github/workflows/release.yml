@@ -17,6 +17,13 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+  # Also on PRs that touch packaging, so a broken release pipeline is caught
+  # before it is needed rather than the first time someone wants a build.
+  pull_request:
+    paths:
+      - ".github/workflows/release.yml"
+      - "App/project.yml"
+      - "web/src/**"
   workflow_dispatch:
 
 concurrency:
