@@ -72,15 +72,35 @@ jobs:
           cp -R "$APP" "$RUNNER_TEMP/Payload/"
           (cd "$RUNNER_TEMP" && zip -qry Oriel-unsigned.ipa Payload)
 
-          # Fail loudly if the JS resources missed the bundle: the app would
-          # install, launch, and silently run no scripts at all.
+          BUNDLE="$RUNNER_TEMP/Payload/Oriel.app"
+
+          # Everything below is a way this .ipa can look fine and be useless.
+          # Each check exists because the failure is silent on the device.
+
+          # 1. No executable => installs, then fails to launch.
+          test -f "$BUNDLE/Oriel" || { echo "FAIL: no executable in the bundle"; exit 1; }
+
+          # 2. Simulator slices => will not install on a phone at all.
+          if ! file "$BUNDLE/Oriel" | grep -q "arm64"; then
+            echo "FAIL: executable is not arm64 — this is a simulator build"
+            file "$BUNDLE/Oriel"
+            exit 1
+          fi
+
+          # 3. Missing JS => installs, launches, and silently runs no scripts,
+          #    which is the worst outcome available here.
           for resource in prelude.js visibility-spoof.js playsinline.js; do
-            test -f "$RUNNER_TEMP/Payload/Oriel.app/$resource" \
-              || { echo "MISSING from bundle: $resource"; exit 1; }
+            test -f "$BUNDLE/$resource" || { echo "FAIL: missing resource $resource"; exit 1; }
           done
 
-          echo "── contents ──"
-          ls "$RUNNER_TEMP/Payload/Oriel.app" | head -20
+          # 4. Missing background mode => the audio feature is quietly absent.
+          /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes:0" "$BUNDLE/Info.plist" \
+            | grep -q audio || { echo "FAIL: UIBackgroundModes:audio not in Info.plist"; exit 1; }
+
+          echo "── bundle ──"
+          ls -la "$BUNDLE"
+          echo "── binary ──"
+          file "$BUNDLE/Oriel"
           echo "── size ──"
           du -h "$RUNNER_TEMP/Oriel-unsigned.ipa"
 
