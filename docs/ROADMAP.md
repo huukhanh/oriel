@@ -251,9 +251,23 @@ valid JavaScript.
 
 ---
 
-## Phase 6 — Built-in library, polish, distribution *(provisional)*
+## Phase 6 — Built-in library, polish, distribution
 
-**Status:** blocked · **Milestone:** `Phase 6`
+**Status:** ✅ **shipping** · **Milestone:** `Phase 6`
+
+The app is installable. `release.yml` builds an unsigned `.ipa` on every push
+to `main` and publishes a GitHub Release on every `v*` tag; the user signs it
+with their own free Apple ID via SideStore/AltStore/Sideloadly, so no Apple
+credentials live in this repo. [TESTING.md](../TESTING.md) is written for
+someone with a phone and no Mac.
+
+Packaging verifies what would otherwise fail silently on the device: the
+executable exists, it is arm64 rather than a simulator slice, all three scripts
+reached the bundle, and `UIBackgroundModes` survived into `Info.plist`.
+
+Still open: a larger built-in script library (§10 of the brainstorm, which is
+missing from the truncated source document), and drag-to-reorder in the script
+list.
 
 The starter library is §10 of the brainstorm, which is **missing from the
 truncated file**. This phase cannot be planned until that section is available.
