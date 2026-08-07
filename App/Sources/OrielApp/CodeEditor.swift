@@ -72,8 +72,35 @@ struct CodeEditor: UIViewRepresentable {
 
         /// §6's keyboard accessory row: the punctuation an iOS keyboard buries
         /// two shifts deep, which is most of JavaScript's.
+        ///
+        /// Typing `{` on an iOS keyboard is two taps into a secondary plane.
+        /// For an app whose entire purpose is writing JavaScript on a phone,
+        /// that is the difference between usable and not.
         func makeAccessoryView(for textView: UITextView) -> UIView? {
-            return nil
+            let buttons: [UIView] = EditorKeys.row.map { key in
+                let button = UIButton(type: .system)
+                button.setTitle(key, for: .normal)
+                button.addAction(
+                    UIAction { [weak textView] _ in
+                        guard let textView else {
+                            return
+                        }
+                        // insertText respects the current selection and the
+                        // undo stack, which setting `.text` directly does not.
+                        textView.insertText(key)
+                        self.text.wrappedValue = textView.text
+                    },
+                    for: .touchUpInside
+                )
+                return button
+            }
+
+            let stack = UIStackView(arrangedSubviews: buttons)
+            stack.axis = .horizontal
+            stack.distribution = .fillEqually
+            stack.spacing = 2
+            stack.frame = CGRect(x: 0, y: 0, width: 0, height: 44)
+            return stack
         }
     }
 }
