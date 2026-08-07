@@ -30,9 +30,17 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: true
 
+# Read-only by default on this repo, which is the right default — but creating
+# a Release writes. Granted at job scope rather than workflow scope so nothing
+# else inherits it.
+permissions:
+  contents: read
+
 jobs:
   ipa:
     runs-on: macos-15
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
