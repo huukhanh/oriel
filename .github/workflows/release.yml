@@ -1,0 +1,129 @@
+# Produces an installable app.
+#
+# The build job proves the code compiles and passes tests; it does not produce
+# anything you can put on a phone. This does.
+#
+# The output is an **unsigned** .ipa. That is deliberate rather than a
+# limitation: signing in CI would need an Apple developer certificate and a
+# provisioning profile uploaded as repository secrets, and those are tied to one
+# Apple ID and one set of device UDIDs. Sideloading tools (SideStore, AltStore,
+# Sideloadly) sign on the user's own machine with the user's own free Apple ID,
+# which needs no secrets here and works for any device.
+#
+# See TESTING.md §2 for the install steps.
+name: release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  # Also on PRs that touch packaging, so a broken release pipeline is caught
+  # before it is needed rather than the first time someone wants a build.
+  pull_request:
+    paths:
+      - ".github/workflows/release.yml"
+      - "App/project.yml"
+      - "web/src/**"
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ipa:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate project
+        working-directory: App
+        run: xcodegen generate
+
+      - name: Archive (unsigned, device)
+        working-directory: App
+        run: |
+          set -o pipefail
+          # `generic/platform=iOS` builds for arm64 device slices, which is what
+          # a real phone needs — a simulator build is x86_64/arm64-simulator and
+          # will not install, however it is packaged.
+          xcodebuild archive \
+            -project Oriel.xcodeproj \
+            -scheme Oriel \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Oriel.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            2>&1 | tail -30
+
+      - name: Package .ipa
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/Oriel.xcarchive/Products/Applications/Oriel.app"
+          test -d "$APP" || { echo "no .app in the archive"; ls -R "$RUNNER_TEMP/Oriel.xcarchive"; exit 1; }
+
+          # An .ipa is just a zip with the .app inside a Payload/ directory.
+          mkdir -p "$RUNNER_TEMP/Payload"
+          cp -R "$APP" "$RUNNER_TEMP/Payload/"
+          (cd "$RUNNER_TEMP" && zip -qry Oriel-unsigned.ipa Payload)
+
+          BUNDLE="$RUNNER_TEMP/Payload/Oriel.app"
+
+          # Everything below is a way this .ipa can look fine and be useless.
+          # Each check exists because the failure is silent on the device.
+
+          # 1. No executable => installs, then fails to launch.
+          test -f "$BUNDLE/Oriel" || { echo "FAIL: no executable in the bundle"; exit 1; }
+
+          # 2. Simulator slices => will not install on a phone at all.
+          if ! file "$BUNDLE/Oriel" | grep -q "arm64"; then
+            echo "FAIL: executable is not arm64 — this is a simulator build"
+            file "$BUNDLE/Oriel"
+            exit 1
+          fi
+
+          # 3. Missing JS => installs, launches, and silently runs no scripts,
+          #    which is the worst outcome available here.
+          for resource in prelude.js visibility-spoof.js playsinline.js; do
+            test -f "$BUNDLE/$resource" || { echo "FAIL: missing resource $resource"; exit 1; }
+          done
+
+          # 4. Missing background mode => the audio feature is quietly absent.
+          /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes:0" "$BUNDLE/Info.plist" \
+            | grep -q audio || { echo "FAIL: UIBackgroundModes:audio not in Info.plist"; exit 1; }
+
+          echo "── bundle ──"
+          ls -la "$BUNDLE"
+          echo "── binary ──"
+          file "$BUNDLE/Oriel"
+          echo "── size ──"
+          du -h "$RUNNER_TEMP/Oriel-unsigned.ipa"
+
+      - name: Upload .ipa
+        uses: actions/upload-artifact@v4
+        with:
+          name: Oriel-unsigned-ipa
+          path: ${{ runner.temp }}/Oriel-unsigned.ipa
+          retention-days: 90
+          if-no-files-found: error
+
+      # Tagged builds also become a Release, so there is a stable URL to
+      # download from a phone rather than an artifact zip that needs a login.
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ runner.temp }}/Oriel-unsigned.ipa
+          generate_release_notes: true
+          body: |
+            **Unsigned build.** Sign it with your own Apple ID when installing —
+            see [TESTING.md](../blob/main/TESTING.md) for the steps.
+
+            Quickest route: install [SideStore](https://sidestore.io) or
+            [AltStore](https://altstore.io), then open this `.ipa` with it.
+            A free Apple ID works; the app then needs re-signing every 7 days.

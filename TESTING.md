@@ -1,180 +1,208 @@
-# Testing
+# Testing Oriel on a real iPhone
 
-The dev box is headless Ubuntu with no Xcode, no simulator, and no compiler.
-Everything in this file runs on a Mac and an iPhone.
-
-Read `docs/api-notes.md` before the first build. Every Apple API in this app is
-**asserted, not verified** — the Linux typecheck harness proves the code is
-internally consistent, not that Apple's signatures match what it assumes.
+**You do not need a Mac.** GitHub Actions builds the app; you install it from
+your phone. First-time setup is about ten minutes, most of it waiting for one
+download.
 
 ---
 
-## 1. What is proven, and what is not
+## 1. Get the app
 
-Being precise about this saves build cycles. **Every row below except the last
-is checked automatically on every push** — `linux-checks.yml` and
-`ios-build.yml`.
+Every push to `main` builds an installable `.ipa`. Two ways to get it:
 
-| Layer | Status | How |
-|---|---|---|
-| `@match` matching, metadata parsing, wrapper generation, settings-rebuild logic, the store, URL normalisation | **proven** | 86 Linux tests |
-| Injection runtime, SPA re-entry, CSP behaviour, `visibility-spoof`, `playsinline`, the media bridge | **proven in a real WebKit engine** | 31 Playwright/WebKit tests |
-| **The app compiles** against the real iOS SDK, Swift 6 mode, strict concurrency | **proven** | macOS runner, `xcodebuild build` |
-| **Content worlds and the message-handler bridge** | **proven at runtime** | 7 simulator tests against a real `WKWebView` |
-| **The app launches and its screens work** | **proven** | 7 XCUITests driving the real app |
-| PiP actually opening a window, background audio, lock screen, AirPlay | **unverified** | needs hardware — §6 |
+**From a release** — a normal download link, works on the phone:
 
-The last row is the only one left. Everything above it is machine-checked, so
-if you are chasing a bug, start by assuming those layers are fine.
+> https://github.com/huukhanh/oriel/releases/latest
 
-## 2. Setup
+**From the latest build** — any commit, needs a GitHub login:
 
-**Requires:** Xcode 16+ (deployment target is iOS 18) and
-[XcodeGen](https://github.com/yonaskolb/XcodeGen).
+> Actions → **release** → newest run → Artifacts → `Oriel-unsigned-ipa`
 
-No `.xcodeproj` is checked in. Project files are generated from `project.yml`,
-because hand-authoring `project.pbxproj` with no Xcode corrupts it in ways that
-are slow and confusing to diagnose.
+The artifact downloads as a `.zip` containing the `.ipa`; unzip it first.
+
+### Why it is unsigned, and what that means for you
+
+Apple will not run an app that nobody has signed. Signing *in CI* would mean
+uploading an Apple certificate and provisioning profile as repository secrets —
+both tied to one Apple ID and a fixed list of device serial numbers. Instead the
+`.ipa` ships unsigned and **you sign it on your own device with your own free
+Apple ID**, using one of the tools below. No secrets are stored anywhere.
+
+The trade: with a **free** Apple ID the signature expires after **7 days** and
+the app stops opening until re-signed — one tap in SideStore/AltStore, and they
+can do it automatically over Wi-Fi. A paid Apple Developer account ($99/yr)
+extends that to a year.
+
+---
+
+## 2. Install it
+
+Pick one. **SideStore** is the least painful if you have no Mac.
+
+### Option A — SideStore (on-device; no computer after setup)
+
+1. Install SideStore: <https://sidestore.io> — follow their one-time setup.
+2. SideStore → **My Apps** → **+** → pick `Oriel-unsigned.ipa`.
+3. Sign in with your Apple ID when asked. It is used only to sign the app.
+4. Wait for the install, then find **Oriel** on your home screen.
+
+### Option B — AltStore (computer running AltServer on the same Wi-Fi)
+
+Same flow: <https://altstore.io>
+
+### Option C — Sideloadly (one-off, computer + cable)
+
+<https://sideloadly.io> — drag the `.ipa` in, enter your Apple ID, plug in the
+phone, click Start.
+
+### Option D — You have a Mac with Xcode
+
+Skip the `.ipa` entirely:
 
 ```sh
-brew install xcodegen        # once
-git clone git@github.com:huukhanh/oriel.git
-cd oriel
+brew install xcodegen
+git clone https://github.com/huukhanh/oriel.git
+cd oriel/App && xcodegen generate && open Oriel.xcodeproj
 ```
 
-### Signing
+Select your iPhone, set **Signing & Capabilities → Team** to your personal team,
+press ⌘R.
 
-Where first builds die. Per `docs/decisions/001-distribution.md` this is
-personal signing with a **free** Apple account:
+### First launch: "Untrusted Developer"
 
-1. Xcode → Settings → Accounts → add your Apple ID.
-2. Open the generated project, select the target → **Signing & Capabilities**.
-3. **Team**: your personal team. **Signing**: Automatic.
-4. On *"Unable to register bundle identifier"*, change
-   `PRODUCT_BUNDLE_IDENTIFIER` in `App/project.yml` and re-run `xcodegen`.
-
-Free accounts: builds **expire after 7 days**, and there is a cap of 10 App IDs
-per 7 days — so reuse one bundle id rather than minting a new one per
-experiment.
-
-> `xcodegen generate` **overwrites the project file**, resetting the Team you
-> picked in the UI. Either re-select it, or add
-> `DEVELOPMENT_TEAM: XXXXXXXXXX` under `settings: base:` in `project.yml`.
-
-### Capabilities
-
-**Background Modes → Audio** should already be ticked, from `UIBackgroundModes`
-in `project.yml`. If that row is missing entirely, the `info:` block did not
-apply — stop and say so, because every audio test would then fail for a reason
-unrelated to the code.
+Expected with a personal signature. **Settings → General → VPN & Device
+Management → [your Apple ID] → Trust.** Once per Apple ID, not per app.
 
 ---
 
-## 3. Build
+## 3. Two-minute smoke test
 
-```sh
-cd App
-xcodegen generate
-open Oriel.xcodeproj
-```
+Each step names how it fails, because "it didn't work" is not actionable.
 
-Pick your iPhone as the destination, ⌘R.
+| # | Do this | Expect | If it fails |
+|---|---|---|---|
+| 1 | Launch Oriel | Address bar on top, YouTube loading, six buttons along the bottom | Immediate crash → not signed correctly; reinstall |
+| 2 | Tap the **lines** button (Log) | Empty — *"No output yet"* | A red `prelude.js is missing from the bundle` means the build is broken. Report it; nothing below will work |
+| 3 | Tap the **{}** button | **"Keep playing in background"** and **"Force inline playback"**, both on, both marked `built-in` | An empty list means the scripts did not reach the bundle |
+| 4 | Type `example.com`, press Go | Loads `https://example.com` | — |
+| 5 | Type `hello world`, press Go | A DuckDuckGo **search**, not a failed navigation | — |
 
-Command line, so output can be pasted back verbatim:
-
-```sh
-cd App
-xcodegen generate
-xcodebuild -project Oriel.xcodeproj -scheme Oriel \
-           -destination 'generic/platform=iOS' build 2>&1 | tail -40
-```
-
-> `App/Package.swift` in that same directory is **not** the app. It is the Linux
-> typecheck harness — stub `SwiftUI`/`UIKit`/`WebKit`/`AVFoundation` modules that
-> let the app sources compile on a machine with no Xcode. Do not open it in
-> Xcode and do not add it as a package dependency.
-
-The same build runs in CI on every push, so it should not surprise you. If it
-fails locally but passes in CI, the difference is your Xcode version or signing,
-not the code.
+All five passing means the app and its injection engine work.
 
 ---
 
-## 4. Smoke test — the five things that prove it is not fundamentally broken
+## 4. The media features — what to actually check
 
-Simulator is fine for all of these except where noted. Under two minutes.
+The part no automated test can reach, and the reason a real device matters.
+**Two of these should work. One is genuinely unknown.**
 
-1. **Launch.** Expect: the address bar, a webview loading m.youtube.com, and a
-   toolbar along the bottom.
-   *Fail signal:* a blank white webview usually means the page loaded but no
-   content — check the Log (step 4) before assuming a crash.
+### 4.1 Page-initiated pause — *should work*
 
-2. **Type `example.com` in the address bar and submit.** Expect: it loads
-   `https://example.com`. Then type `hello world`. Expect: a DuckDuckGo search,
-   not a failed navigation. (This path is Linux-tested in `URLNormalizerTests`,
-   so a failure here means the wiring is wrong, not the parsing.)
+The most valuable single test in this document.
 
-3. **Open the scripts sheet** (the `{}` button — its number is how many scripts
-   match the current page). Expect: **"Keep playing in background"** and
-   **"Force inline playback"**, both enabled, both labelled `built-in`.
-   *Fail signal:* an empty list means the built-in `.js` files did not make it
-   into the bundle. Check step 4 for a `missing from the bundle` line.
+1. Play any YouTube video.
+2. **Switch to another app**, wait ~10 seconds, come back.
 
-4. **Open the Log** (the lines button). Expect: no `error` entries.
-   *This is the highest-value screen in the app when anything is wrong* — it
-   captures document-start activity that Safari's Web Inspector will miss if
-   you attach late.
-   *Fail signal:* `prelude.js is missing from the bundle — no user script can
-   run` means the resources phase is wrong and **nothing else below will work**.
+**Expect: still playing.** YouTube normally pauses itself the moment it thinks
+you looked away; the built-in `visibility-spoof` prevents that, and it is
+verified in a real WebKit engine.
 
-5. **Open Settings, toggle "Desktop site", then toggle "Autoplay".** Expect: the
-   first applies without reloading; the second **reloads the page**, because it
-   is under "Reloads the page". That difference is the whole of §4.2 — a
-   configuration flag cannot change on a live webview, so the app rebuilds it.
-   *Fail signal:* if "Autoplay" does *not* reload, the rebuild path is not
-   wired and that setting is silently doing nothing.
+**Then prove the script is what did it:** open `{}`, turn **"Keep playing in
+background"** off, repeat. YouTube should now pause. That contrast is the real
+test — identical behaviour both ways means the script is not running.
+
+### 4.2 Picture in Picture — *should work*
+
+1. Play a video.
+2. Tap the **PiP** button in the toolbar (rectangle-with-arrow).
+
+**Expect:** a floating video window that keeps playing when you leave the app.
+
+**If nothing happens, open the Log first.** It says which half failed:
+
+- `Picture in Picture: no-media` — no video found on the page
+- `Picture in Picture: unsupported` — the site's player refuses it
+- nothing logged — PiP was requested and the system declined
+
+### 4.3 Background audio with the screen locked — *unknown, please record*
+
+Never verified on hardware. Per
+[decision 004](docs/decisions/004-background-audio-unverified.md) the app is
+deliberately built so nothing else depends on it.
+
+1. Play a video. **Lock the screen** with the side button.
+2. Listen for 60 seconds, then for 10 minutes.
+
+Record which happened — different causes, different fixes:
+
+| What you hear | What it means |
+|---|---|
+| Continues indefinitely | It works. |
+| Stops **immediately** on lock | The audio session is not taking effect. |
+| Stops after **~30s–3min** | WebKit's media process is being suspended. **Note the timing** — "died at 25 seconds" and "good for 8 minutes" imply different apps. |
+
+Post the result on [issue #1](https://github.com/huukhanh/oriel/issues/1) with
+your **iPhone model and iOS version** — behaviour differs across both.
 
 ---
 
-## 5. Scripts and injection (simulator is sufficient)
+## 5. Writing a script (the point of the app)
 
-1. In the scripts sheet, tap **New**. A template appears with a metadata block.
-2. Change `@match` to `*://*.example.com/*` and the body to
-   `GM_log("it ran")`. Save.
-3. Navigate to `example.com`. Open the Log.
-   Expect: a line from your script id saying `it ran`.
-4. Navigate to `wikipedia.org`. Reload. Expect: **no** new line — the guard
-   should stop it running off-match.
-5. Turn the script off in the list, return to `example.com`, reload.
-   Expect: no line. Turn it back on: the line returns.
-6. Type a deliberately broken `@match` such as `nonsense`. Expect: a warning
-   under the editor naming the line, and the list shows **"matches nothing —
-   will never run"**. It must not silently match everything.
+1. `{}` → **New**. A working template appears.
+2. Change `@match` to `*://*.example.com/*` and the body to `GM_log("it ran")`.
+3. Tap **Run on this page now** — no save, no reload.
+4. Open the Log. Expect `it ran`.
+5. Go to `wikipedia.org` and reload. Expect **nothing** — the match guard is
+   stopping it, which is the whole safety mechanism.
+6. Type a broken `@match` such as `nonsense`. Expect a warning naming the line,
+   and the list showing **"matches nothing — will never run"**. It must never
+   silently match everything.
 
-## 6. Media — **real device only**
+Pasted Tampermonkey scripts generally work as-is. Differences are in
+[`docs/userscript-api.md`](docs/userscript-api.md) — most importantly
+`GM_getValue` is `async` here.
 
-Simulator media behaviour does not reflect the device; a simulator pass here
-proves nothing.
+---
 
-1. Play a video on YouTube. Lock the screen.
-   Expect: *possibly* audio continues. Per
-   `docs/decisions/004-background-audio-unverified.md` this is **opportunistic
-   and unproven** — record what happens, do not treat failure as a bug.
-2. With the video playing, switch to another app and back.
-   Expect: the video is **still playing**, not paused. This one is not
-   opportunistic — `visibility-spoof` is verified in a real WebKit engine, and
-   its job is exactly this. If the page paused itself, check the scripts sheet
-   to confirm "Keep playing in background" is enabled and on-match.
-3. Turn that script **off**, repeat step 2. Expect: YouTube now pauses. That
-   contrast is the proof the script is doing its job.
+## 6. Debugging with a Mac (optional, but the strongest tool available)
 
-## 7. Known broken
+`isInspectable` is on in debug builds, so Safari can attach to the app's webview
+and give you a real console on the device.
 
-- **Smart quotes in the editor** (`docs/api-notes.md`). `TextEditor` has no
-  `smartQuotesType`, so iOS may replace `"` with a curly quote that is not valid
-  JavaScript — invisibly. Until a `UITextView` wrapper lands, type script
-  sources carefully or paste them in.
-- **`GM_setValue`/`GM_getValue` are not implemented** — see
-  `docs/userscript-api.md`.
-- Phase 0's background-audio question is still unanswered
-  ([#1](https://github.com/huukhanh/oriel/issues/1)).
+1. iPhone: **Settings → Safari → Advanced → Web Inspector** on.
+2. Mac Safari: **Settings → Advanced → Show features for web developers** on.
+3. Connect by cable, run the app, then Mac Safari → **Develop** → *your iPhone*
+   → the page.
+
+If a bug is inside injected JavaScript this turns guesswork into a stack trace.
+Grab the in-app Log too — it captures document-start activity that Web Inspector
+misses if you attach late.
+
+---
+
+## 7. Reporting a problem
+
+Post to [Issues](https://github.com/huukhanh/oriel/issues) with:
+
+1. **Which step** failed, and what happened instead.
+2. **iPhone model and iOS version** — essential for anything media-related.
+3. **The Log contents** (Log sheet → **Copy**), verbatim rather than summarised.
+4. Any **install** error verbatim, if it never launched.
+
+---
+
+## 8. What is already proven, so you can skip suspecting it
+
+Checked automatically on every push.
+
+| Layer | How |
+|---|---|
+| Match compiling, metadata parsing, wrapper generation, settings, storage, URL parsing | 86 unit tests |
+| Injection runtime, SPA re-entry, CSP, both built-ins, media bridge | 31 tests in a **real WebKit engine** |
+| Compiles against the real iOS SDK, Swift 6, strict concurrency | macOS CI |
+| Content worlds, the message bridge, `GM_setValue`, the editor's smart-quote settings | 16 tests against a real `WKWebView` |
+| The app launches and its screens present | 7 UI tests in the simulator |
+| The `.ipa` is arm64, has its executable, contains all three scripts | packaging checks |
+
+**Not covered by any of that:** everything in §4. That is where your phone is the
+only instrument.
