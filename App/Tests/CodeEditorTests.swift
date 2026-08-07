@@ -69,6 +69,19 @@ final class CodeEditorTests: XCTestCase {
         )
     }
 
+    /// The row is the difference between usable and not: `{` is two taps into
+    /// a secondary keyboard plane on iOS, and this app exists to write
+    /// JavaScript on a phone.
+    func testAccessoryRowIsActuallyBuilt() {
+        let view = UITextView()
+        let coordinator = CodeEditor.Coordinator(text: .constant(""))
+        let accessory = coordinator.makeAccessoryView(for: view)
+        XCTAssertNotNil(
+            accessory,
+            "the accessory row returned nil — it was a stub pretending to be a feature"
+        )
+    }
+
     func testAccessoryKeysAreSingleCharacters() {
         XCTAssertTrue(
             EditorKeys.isWellFormed,

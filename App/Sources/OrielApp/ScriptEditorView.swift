@@ -1,6 +1,7 @@
 import Core
 import Foundation
 import SwiftUI
+import UIKit
 
 /// §6's editor. The on-device authoring loop lives or dies here.
 struct ScriptEditorView: View {
@@ -39,6 +40,20 @@ struct ScriptEditorView: View {
                     Button("Save") {
                         _ = model.upsertUserScript(id: scriptID, source: source)
                         dismiss()
+                    }
+                }
+                ToolbarItem(placement: .bottomBar) {
+                    // How a script actually arrives on a phone: copied from a
+                    // forum or a gist. A file picker is the rarer path.
+                    Button("Paste") {
+                        if let pasted = UIPasteboard.general.string, pasted.isEmpty == false {
+                            source = pasted
+                        }
+                    }
+                }
+                ToolbarItem(placement: .bottomBar) {
+                    Button("Copy") {
+                        UIPasteboard.general.string = source
                     }
                 }
                 ToolbarItem(placement: .bottomBar) {

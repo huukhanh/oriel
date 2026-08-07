@@ -145,3 +145,58 @@ public protocol UITextViewDelegate: AnyObject {
 extension UITextViewDelegate {
     public func textViewDidChange(_ textView: UITextView) {}
 }
+
+// MARK: - Accessory row
+//
+// Closure-based (`UIAction`) rather than target/action: `Selector` is an
+// Objective-C runtime type that does not exist on Linux, so `#selector` would
+// make the app unbuildable here. It is also the better modern API.
+
+public struct UIAction: Sendable {
+    public let handler: @MainActor @Sendable () -> Void
+    public init(handler: @escaping @MainActor @Sendable () -> Void) {
+        self.handler = handler
+    }
+    public init(title: String, handler: @escaping @MainActor @Sendable () -> Void) {
+        self.handler = handler
+    }
+}
+
+public enum UIControl {
+    public struct State: OptionSet, Sendable {
+        public let rawValue: UInt
+        public init(rawValue: UInt) { self.rawValue = rawValue }
+        public static let normal = State(rawValue: 0)
+    }
+    public struct Event: OptionSet, Sendable {
+        public let rawValue: UInt
+        public init(rawValue: UInt) { self.rawValue = rawValue }
+        public static let touchUpInside = Event(rawValue: 1 << 6)
+    }
+}
+
+@MainActor
+open class UILabel: UIView {
+    public var text: String?
+    public var font: UIFont?
+}
+
+@MainActor
+open class UIButton: UIView {
+    public enum ButtonType: Sendable { case system, custom }
+    public init(type: ButtonType) { super.init() }
+    public func setTitle(_ title: String?, for state: UIControl.State) {}
+    public func setTitleColor(_ color: UIColor?, for state: UIControl.State) {}
+    public func addAction(_ action: UIAction, for event: UIControl.Event) {}
+    public var titleLabel: UILabel? { nil }
+}
+
+@MainActor
+open class UIStackView: UIView {
+    public enum Axis: Sendable { case horizontal, vertical }
+    public enum Distribution: Sendable { case fill, fillEqually, equalSpacing }
+    public init(arrangedSubviews: [UIView]) { super.init() }
+    public var axis: Axis = .horizontal
+    public var distribution: Distribution = .fill
+    public var spacing: CGFloat = 0
+}
