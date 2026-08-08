@@ -57,7 +57,11 @@ final class AppLaunchUITests: XCTestCase {
         XCTAssertTrue(toggle.waitForExistence(timeout: 10), "the toggle is missing from Settings")
 
         let before = toggle.value as? String
-        toggle.tap()
+        // Tap the right-hand side, where the switch actually is. A plain
+        // `.tap()` on a SwiftUI Form row lands on the label and does nothing —
+        // which is what the previous run proved, by reporting the value
+        // unchanged rather than the address bar missing.
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
 
         // Separating these two matters: if the switch never flipped, the fault
         // is the tap; if it flipped and the bar stayed hidden, the fault is the
