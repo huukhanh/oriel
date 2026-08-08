@@ -194,6 +194,7 @@ public enum ScriptCatalog {
         switch id {
         case "visibility-spoof": return -100
         case "playsinline": return -90
+        case "speed-hud": return -80
         default: return -50
         }
     }

@@ -51,7 +51,7 @@ fi
 
 [ -d "$APP" ] || die "no Oriel.app was produced at $APP"
 # A build that installs and silently runs no scripts is the worst outcome here.
-for r in prelude.js visibility-spoof.js playsinline.js; do
+for r in prelude.js visibility-spoof.js playsinline.js speed-hud.js; do
     [ -f "$APP/$r" ] || die "$r is missing from the app bundle — this build is broken"
 done
 

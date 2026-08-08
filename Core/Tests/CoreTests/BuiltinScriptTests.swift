@@ -64,17 +64,36 @@ final class BuiltinScriptTests: XCTestCase {
         }
     }
 
-    /// Both current built-ins override page behaviour, and both are useless
-    /// unless they beat the page's own listeners.
-    func testMediaBuiltinsRunAtDocumentStartInThePageWorld() throws {
+    /// The timing requirement is per-script, not blanket.
+    ///
+    /// A built-in that **overrides page behaviour** must beat the page's own
+    /// listeners, so document-start is mandatory: spoofing `document.hidden`
+    /// after the site installed its `visibilitychange` handler accomplishes
+    /// nothing. A built-in that **adds UI** needs a DOM to attach to, so
+    /// document-start would break it — `document.body` is nil there.
+    ///
+    /// Getting either backwards produces a script that loads, logs nothing, and
+    /// silently does not work. That is issue #32's failure mode.
+    func testEachBuiltinRunsAtTheTimingItsJobRequires() throws {
+        let mustBeatThePage: Set<String> = ["visibility-spoof", "playsinline"]
+
         for builtin in try Self.builtinSources() {
             let metadata = UserScriptMetadata.parse(builtin.source)
-            XCTAssertEqual(
-                metadata.runAt,
-                .documentStart,
-                "\(builtin.id) must run at document-start — overriding page behaviour "
-                    + "after the page installed its handlers accomplishes nothing"
-            )
+            if mustBeatThePage.contains(builtin.id) {
+                XCTAssertEqual(
+                    metadata.runAt,
+                    .documentStart,
+                    "\(builtin.id) overrides page behaviour, so it must run before the "
+                        + "page's own handlers are installed"
+                )
+            } else {
+                XCTAssertNotEqual(
+                    metadata.runAt,
+                    .documentStart,
+                    "\(builtin.id) touches the DOM, and document.body is nil at "
+                        + "document-start"
+                )
+            }
             XCTAssertEqual(
                 metadata.world,
                 .page,

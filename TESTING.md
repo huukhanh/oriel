@@ -131,7 +131,7 @@ Each step names how it fails, because "it didn't work" is not actionable.
 |---|---|---|---|
 | 1 | Launch Oriel | YouTube loading, six buttons along the bottom, **no address bar** | Immediate crash → not signed correctly; reinstall |
 | 2 | Tap the **lines** button (Log) | Empty — *"No output yet"* | A red `prelude.js is missing from the bundle` means the build is broken. Report it; nothing below will work |
-| 3 | Tap the **{}** button | **"Keep playing in background"** and **"Force inline playback"**, both on, both marked `built-in` | An empty list means the scripts did not reach the bundle |
+| 3 | Tap the **{}** button | Three built-ins: **Keep playing in background**, **Force inline playback**, **Playback speed** | An empty list means the scripts did not reach the bundle |
 | 4 | Tap the **house** button, type `example.com`, press Go | Loads `https://example.com` | — |
 | 5 | House button again, type `hello world` | A DuckDuckGo **search**, not a failed navigation | — |
 | 6 | House button again | The site you just visited is under **Recent** | — |
@@ -210,6 +210,13 @@ your **iPhone model and iOS version** — behaviour differs across both.
 
 **If a script throws**, the Log button in the toolbar turns into an orange
 warning with a count. You do not have to go looking.
+
+### Playback speed
+
+On any page with a video, a small `−  1x  +` control sits above the toolbar.
+It goes to 4x, remembers your choice per site, and re-applies itself when a
+site swaps the player — which is what makes it stick on an SPA where the
+built-in menu resets every video.
 
 **`@run-at` matters more than it looks.** `document-end` is the default and is
 what you want for anything that reads or changes the page — at

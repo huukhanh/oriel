@@ -223,3 +223,94 @@ describe("built-ins together", () => {
         await context.close();
     });
 });
+
+describe("speed-hud", () => {
+    const SPEED = wrapped("speed-hud");
+
+    /// No GM storage stub: the real bridge is absent here, so this exercises
+    /// exactly what happens when persistence is unavailable. The control must
+    /// still appear — gating it behind the storage promise was a real flaw,
+    /// and this is what would catch a regression.
+    async function withVideo() {
+        const { context, page } = await pageWithPrelude(browser, [SPEED]);
+        await page.goto(server.url("/"));
+        await page.waitForFunction(() => document.querySelector("[data-oriel-speed]") !== null, {
+            timeout: 5000
+        });
+        return { context, page };
+    }
+
+    it("shows a control only when the page has a video", async () => {
+        const { context, page } = await withVideo();
+        expect(await page.evaluate(() => {
+            const el = document.querySelector("[data-oriel-speed]");
+            return el && el.style.display !== "none";
+        })).toBe(true);
+        await context.close();
+    });
+
+    it("changes the video's playbackRate", async () => {
+        const { context, page } = await withVideo();
+        const rate = await page.evaluate(async () => {
+            const buttons = document.querySelectorAll("[data-oriel-speed] button");
+            buttons[buttons.length - 1].click();  // "+"
+            await new Promise((r) => setTimeout(r, 50));
+            return document.getElementById("v").playbackRate;
+        });
+        expect(rate).toBeGreaterThan(1);
+        await context.close();
+    });
+
+    it("re-applies the rate to a video added later", async () => {
+        // An SPA swapping the player would otherwise silently reset to 1x.
+        const { context, page } = await withVideo();
+        const rate = await page.evaluate(async () => {
+            const buttons = document.querySelectorAll("[data-oriel-speed] button");
+            buttons[buttons.length - 1].click();
+            await new Promise((r) => setTimeout(r, 50));
+            const fresh = document.createElement("video");
+            document.body.appendChild(fresh);
+            await new Promise((r) => setTimeout(r, 150));
+            return fresh.playbackRate;
+        });
+        expect(rate).toBeGreaterThan(1);
+        await context.close();
+    });
+
+    it("overrides a player that resets the rate itself", async () => {
+        const { context, page } = await withVideo();
+        const rate = await page.evaluate(async () => {
+            const buttons = document.querySelectorAll("[data-oriel-speed] button");
+            buttons[buttons.length - 1].click();
+            await new Promise((r) => setTimeout(r, 50));
+            const video = document.getElementById("v");
+            video.playbackRate = 1;                       // the site fighting back
+            video.dispatchEvent(new Event("ratechange"));
+            await new Promise((r) => setTimeout(r, 50));
+            return video.playbackRate;
+        });
+        expect(rate).toBeGreaterThan(1);
+        await context.close();
+    });
+
+    it("removes the control and restores 1x when switched off", async () => {
+        const { context, page } = await withVideo();
+        const after = await page.evaluate(async () => {
+            const buttons = document.querySelectorAll("[data-oriel-speed] button");
+            buttons[buttons.length - 1].click();
+            await new Promise((r) => setTimeout(r, 50));
+
+            const entry = window.__inj._entries["speed-hud"];
+            entry.patterns = [];
+            window.dispatchEvent(new Event("__inj:navigate"));
+            await new Promise((r) => setTimeout(r, 50));
+            return {
+                hud: document.querySelector("[data-oriel-speed]") !== null,
+                rate: document.getElementById("v").playbackRate
+            };
+        });
+        expect(after.hud, "the control outlived the script").toBe(false);
+        expect(after.rate, "the page was left sped up after switching off").toBe(1);
+        await context.close();
+    });
+});
