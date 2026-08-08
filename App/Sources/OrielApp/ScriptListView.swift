@@ -19,10 +19,21 @@ struct ScriptListView: View {
                         row(for: script)
                     }
                 }
-                Section("All scripts") {
+                Section {
                     ForEach(model.scripts, id: \.id) { script in
                         row(for: script)
                     }
+                    .onMove { source, destination in
+                        model.moveScripts(from: source, to: destination)
+                    }
+                } header: {
+                    HStack {
+                        Text("All scripts")
+                        Spacer()
+                        EditButton()
+                    }
+                } footer: {
+                    Text("Order is injection order — earlier scripts run first.")
                 }
             }
             .navigationTitle("Scripts")

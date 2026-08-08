@@ -149,6 +149,11 @@ public struct Spacer: View {
     public init(minLength: CGFloat? = nil) { _ = minLength }
 }
 
+public struct EditButton: View {
+    public typealias Body = Never
+    public init() {}
+}
+
 public struct Divider: View {
     public typealias Body = Never
     public init() {}
@@ -291,8 +296,13 @@ public struct Form<Content: View>: View {
     public init(@ViewBuilder content: () -> Content) { _ = content() }
 }
 
-public struct Section<Parent, Content: View, Footer>: View {
+public struct Section<Parent, Content: View, Footer: View>: View {
     public typealias Body = Never
+    public init(
+        @ViewBuilder content: () -> Content,
+        @ViewBuilder header: () -> Parent,
+        @ViewBuilder footer: () -> Footer
+    ) { _ = content() }
     public init(
         @ViewBuilder content: () -> Content
     ) where Parent == EmptyView, Footer == EmptyView { _ = content() }
@@ -675,6 +685,7 @@ extension View {
     public func environment<V>(_ keyPath: WritableKeyPath<EnvironmentValues, V>, _ value: V)
         -> some View
     { _Stub() }
+    public func onMove(perform action: ((IndexSet, Int) -> Void)?) -> some View { _Stub() }
     public func swipeActions<T: View>(
         edge: HorizontalAlignment = .trailing,
         allowsFullSwipe: Bool = true,

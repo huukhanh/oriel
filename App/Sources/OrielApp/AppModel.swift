@@ -138,6 +138,20 @@ final class AppModel: ObservableObject {
         reinject()
     }
 
+    /// Injection order is list order, so this is not cosmetic: a script that
+    /// overrides page behaviour has to run before one that reads it.
+    func moveScripts(from source: IndexSet, to destination: Int) {
+        state = ScriptOrdering.move(
+            in: scripts,
+            from: source,
+            to: destination,
+            state: state
+        )
+        persist()
+        refreshScripts()
+        reinject()
+    }
+
     func upsertUserScript(id: String?, source: String) -> String {
         let scriptID = id ?? UUID().uuidString
         let script = Script(
