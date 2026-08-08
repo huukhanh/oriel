@@ -14,6 +14,7 @@ public enum BuiltinLibrary {
     public static let ids: [String] = [
         "visibility-spoof",
         "playsinline",
+        "speed-hud",
     ]
 
     /// `id` → source, for whatever is actually present in the bundle.

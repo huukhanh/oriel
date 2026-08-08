@@ -108,7 +108,7 @@ jobs:
 
           # 3. Missing JS => installs, launches, and silently runs no scripts,
           #    which is the worst outcome available here.
-          for resource in prelude.js visibility-spoof.js playsinline.js; do
+          for resource in prelude.js visibility-spoof.js playsinline.js speed-hud.js; do
             test -f "$BUNDLE/$resource" || { echo "FAIL: missing resource $resource"; exit 1; }
           done
 

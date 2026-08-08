@@ -42,6 +42,8 @@ targets:
         buildPhase: resources
       - path: ../web/src/builtins/playsinline.js
         buildPhase: resources
+      - path: ../web/src/builtins/speed-hud.js
+        buildPhase: resources
       # An app icon matters more than usual here: a sideloaded app with a blank
       # icon is indistinguishable from one that failed to install.
       - path: Sources/Assets.xcassets
@@ -101,6 +103,8 @@ targets:
       - path: ../web/src/builtins/visibility-spoof.js
         buildPhase: resources
       - path: ../web/src/builtins/playsinline.js
+        buildPhase: resources
+      - path: ../web/src/builtins/speed-hud.js
         buildPhase: resources
     dependencies:
       - target: Oriel
