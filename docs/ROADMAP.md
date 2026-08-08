@@ -265,9 +265,13 @@ Packaging verifies what would otherwise fail silently on the device: the
 executable exists, it is arm64 rather than a simulator slice, all three scripts
 reached the bundle, and `UIBackgroundModes` survived into `Info.plist`.
 
-Still open: a larger built-in script library (§10 of the brainstorm, which is
-missing from the truncated source document), and drag-to-reorder in the script
-list.
+Shipped since: `speed-hud` (named in §2, so buildable despite §10 being
+missing), drag-to-reorder, and the fixes from user feedback — `@run-at` being
+ignored, a hidden address bar with a Home screen, and scripts reachable from
+Settings.
+
+Still open: the rest of §10's library, which cannot be planned while that
+section is missing.
 
 The starter library is §10 of the brainstorm, which is **missing from the
 truncated file**. This phase cannot be planned until that section is available.
