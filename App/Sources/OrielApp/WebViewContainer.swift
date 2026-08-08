@@ -111,6 +111,7 @@ struct WebViewContainer: UIViewRepresentable {
             model.pageTitle = webView.title ?? ""
             model.canGoBack = webView.canGoBack
             model.isLoading = false
+            model.recordVisit(url: webView.url, title: webView.title ?? "")
         }
 
         func webView(

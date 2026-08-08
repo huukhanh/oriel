@@ -17,7 +17,9 @@ struct BrowserView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            addressBar
+            if model.state.settings.showAddressBar {
+                addressBar
+            }
             // Keyed on the generation counter: when a configuration-affecting
             // setting changes, AppModel bumps it and SwiftUI discards this
             // webview and builds a new one. That is the only way those flags
@@ -123,11 +125,14 @@ struct BrowserView: View {
             }
             .accessibilityIdentifier("toolbar.log")
 
+            // Home, not a bookmarks grid. With the address bar hidden this is
+            // the only way to reach a different site, so it is not optional
+            // chrome — #34.
             Button(action: { showingLauncher = true }) {
-                Image(systemName: "square.grid.2x2")
+                Image(systemName: "house")
                     .frame(maxWidth: .infinity)
             }
-            .accessibilityIdentifier("toolbar.bookmarks")
+            .accessibilityIdentifier("toolbar.home")
 
             Button(action: { showingSettings = true }) {
                 Image(systemName: "gearshape")
