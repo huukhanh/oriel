@@ -34,7 +34,7 @@ struct BrowserView: View {
             SettingsView()
                 .environmentObject(model)
         }
-        .sheet(isPresented: $showingLog) {
+        .sheet(isPresented: $showingLog, onDismiss: { model.acknowledgeErrors() }) {
             LogView()
                 .environmentObject(model)
         }
@@ -111,8 +111,15 @@ struct BrowserView: View {
             .accessibilityIdentifier("toolbar.scripts")
 
             Button(action: { showingLog = true }) {
-                Image(systemName: "text.alignleft")
-                    .frame(maxWidth: .infinity)
+                // The count, not just the icon: a script that threw is
+                // otherwise invisible unless you happen to open the log.
+                Label(
+                    model.errorCount > 0 ? "\(model.errorCount)" : "",
+                    systemImage: model.errorCount > 0
+                        ? "exclamationmark.triangle.fill" : "text.alignleft"
+                )
+                .foregroundStyle(model.errorCount > 0 ? Color.orange : Color.accentColor)
+                .frame(maxWidth: .infinity)
             }
             .accessibilityIdentifier("toolbar.log")
 

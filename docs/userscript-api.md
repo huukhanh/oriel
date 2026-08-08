@@ -30,7 +30,7 @@ into).
 | `@version` | yes | Stored, not acted on. Nothing auto-updates. |
 | `@namespace` | yes | Stored only. |
 | `@match` | yes | Repeatable. See below. |
-| `@run-at` | yes | `document-start` (default) · `document-end` · `document-idle` |
+| `@run-at` | yes | `document-end` (default) · `document-start` · `document-idle` — see below |
 | `@world` | yes | `page` (default) · `isolated` |
 | `@noframes` | yes | |
 | `@include` / `@exclude` | **no** | Use `@match`. `@include` allows patterns that cannot be evaluated safely. |
@@ -41,6 +41,23 @@ into).
 
 Unknown keys are **never dropped silently** — they surface as warnings in the
 editor, with line numbers.
+
+### `@run-at` — get this right or your script does nothing
+
+| Value | Runs | Use for |
+|---|---|---|
+| `document-end` **(default)** | once the DOM exists | Anything that reads or changes the page. Almost everything. |
+| `document-start` | before the page's own scripts | **Only** for overriding page behaviour — `document.hidden`, `history`, a player API. |
+| `document-idle` | after `load`, images included | Work that should not compete with the page loading. |
+
+**`document.body` is `null` at `document-start`.** A script that does
+`document.body.style...` there throws before it can do anything, and the page
+looks untouched. This is the single most common way a working script appears to
+do nothing — it is why the default is `document-end` and why the editor's
+template says so.
+
+If you paste a Tampermonkey script that declares `@run-at document-start` and it
+seems dead, check whether it actually needs that timing.
 
 ### `@match`
 

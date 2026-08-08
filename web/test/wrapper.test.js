@@ -21,19 +21,19 @@ const golden = readFileSync(join(repoRoot, "fixtures", "wrapper-golden.js"), "ut
 const WATCH_1 = "https://www.youtube.com/watch?v=1";
 
 describe("generated wrapper", () => {
-    it("parses and runs as a classic script", () => {
-        const win = makeWindow(WATCH_1);
+    it("parses and runs as a classic script", async () => {
+        const win = await makeWindow(WATCH_1);
         expect(() => evaluateIn(win, golden)).not.toThrow();
     });
 
-    it("registers under the id Swift emitted", () => {
-        const win = makeWindow(WATCH_1);
+    it("registers under the id Swift emitted", async () => {
+        const win = await makeWindow(WATCH_1);
         evaluateIn(win, golden);
         expect(Object.keys(win.__inj._entries)).toEqual(["hide-shorts"]);
     });
 
-    it("runs its body on a matching URL, with the GM aliases bound", () => {
-        const win = makeWindow(WATCH_1);
+    it("runs its body on a matching URL, with the GM aliases bound", async () => {
+        const win = await makeWindow(WATCH_1);
         evaluateIn(win, golden);
         // The golden script's body calls GM_addStyle. If the aliases were not
         // bound, the body throws and no style appears.
@@ -43,20 +43,20 @@ describe("generated wrapper", () => {
         );
     });
 
-    it("does not run on a host its pattern does not cover", () => {
-        const win = makeWindow("https://example.com/");
+    it("does not run on a host its pattern does not cover", async () => {
+        const win = await makeWindow("https://example.com/");
         evaluateIn(win, golden);
         expect(win.document.querySelectorAll("style").length).toBe(0);
     });
 
-    it("matches a subdomain, driven by the descriptor Swift emitted", () => {
-        const win = makeWindow("https://m.youtube.com/watch?v=9");
+    it("matches a subdomain, driven by the descriptor Swift emitted", async () => {
+        const win = await makeWindow("https://m.youtube.com/watch?v=9");
         evaluateIn(win, golden);
         expect(win.document.querySelectorAll("style").length).toBe(1);
     });
 
-    it("keeps its style across same-site route changes without duplicating it", () => {
-        const win = makeWindow(WATCH_1);
+    it("keeps its style across same-site route changes without duplicating it", async () => {
+        const win = await makeWindow(WATCH_1);
         evaluateIn(win, golden);
         navigate(win, "/feed/subscriptions");
         navigate(win, "/watch?v=2");
@@ -66,7 +66,7 @@ describe("generated wrapper", () => {
         ).toBe(1);
     });
 
-    it("is inert when the prelude is absent rather than throwing", () => {
+    it("is inert when the prelude is absent rather than throwing", async () => {
         // A user script can outlive its runtime — a world without the prelude,
         // or an injection-ordering mistake. It must fail quietly, not with an
         // exception on every page load.
@@ -78,7 +78,7 @@ describe("generated wrapper", () => {
         expect(bare.window.document.querySelectorAll("style").length).toBe(0);
     });
 
-    it("contains no eval or Function constructor", () => {
+    it("contains no eval or Function constructor", async () => {
         // Asserted on the shipped artifact, not only on Swift's output: a user
         // script is exempt from the page's CSP, but eval inside it is not.
         expect(golden).not.toMatch(/\beval\s*\(/);

@@ -259,16 +259,55 @@
         };
     }
 
+    /// Run `fn` when the document has reached `runAt`.
+    ///
+    /// `document-start` is immediate — that is its whole purpose, and the media
+    /// built-ins depend on beating the page's own listeners. The other two wait
+    /// for the DOM, because a script that touches `document.body` at
+    /// document-start finds `null` (issue #32).
+    ///
+    /// Already past that point — which is every "run on this page now" — runs
+    /// immediately rather than waiting for an event that has already fired.
+    function whenReady(runAt, fn) {
+        if (runAt === "document-start") {
+            fn();
+            return;
+        }
+        var readyState = global.document.readyState;
+        if (runAt === "document-idle") {
+            if (readyState === "complete") {
+                fn();
+            } else {
+                global.addEventListener("load", fn, { once: true });
+            }
+            return;
+        }
+        // document-end
+        if (readyState === "interactive" || readyState === "complete") {
+            fn();
+        } else {
+            global.document.addEventListener("DOMContentLoaded", fn, { once: true });
+        }
+    }
+
     function start(entry) {
         entry.running = true;
-        try {
-            entry.body(makeAPI(entry));
-        } catch (error) {
-            // A script that throws on start is still "running" as far as
-            // teardown is concerned — it may have registered cleanups before
-            // it failed, and those must still run when it stops.
-            report(entry.id, error);
-        }
+        whenReady(entry.runAt, function () {
+            // The pattern can stop matching between scheduling and firing —
+            // an SPA route change while waiting for DOMContentLoaded — and
+            // running then would put a script on a page it does not match.
+            if (!entry.running) {
+                return;
+            }
+            try {
+                entry.body(makeAPI(entry));
+            } catch (error) {
+                // A script that throws is still "running" as far as teardown is
+                // concerned: it may have registered cleanups before it failed,
+                // and those must still run when it stops.
+                report(entry.id, error);
+            }
+        });
     }
 
     function stop(entry) {
@@ -285,7 +324,7 @@
         }
     }
 
-    function register(id, patterns, body) {
+    function register(id, patterns, body, runAt) {
         if (entries[id]) {
             // Re-registering the same id — the user edited the script and hit
             // "run on current page now" — tears the old one down first, so an
@@ -298,6 +337,10 @@
             id: id,
             patterns: patterns || [],
             body: body,
+            // document-end by default: a script that reads or changes the DOM
+            // is the common case, and one that must beat the page's own
+            // listeners is the expert case that says so explicitly.
+            runAt: runAt || "document-end",
             cleanups: [],
             routeHandlers: [],
             running: false

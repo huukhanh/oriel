@@ -9,8 +9,8 @@ const HOME = "https://www.youtube.com/";
 const WATCH_1 = "https://www.youtube.com/watch?v=1";
 
 describe("prelude installation", () => {
-    it("patches history exactly once", () => {
-        const win = makeWindow(HOME);
+    it("patches history exactly once", async () => {
+        const win = await makeWindow(HOME);
         const patched = win.history.pushState;
         const inj = win.__inj;
 
@@ -24,8 +24,8 @@ describe("prelude installation", () => {
         expect(win.__inj).toBe(inj);
     });
 
-    it("dispatches __inj:navigate on pushState and replaceState", () => {
-        const win = makeWindow(HOME);
+    it("dispatches __inj:navigate on pushState and replaceState", async () => {
+        const win = await makeWindow(HOME);
         let n = 0;
         win.addEventListener("__inj:navigate", () => n++);
         win.history.pushState({}, "", "/watch?v=1");
@@ -35,29 +35,29 @@ describe("prelude installation", () => {
 });
 
 describe("registration and matching", () => {
-    it("runs a script whose pattern matches at registration", () => {
-        const win = makeWindow(WATCH_1);
+    it("runs a script whose pattern matches at registration", async () => {
+        const win = await makeWindow(WATCH_1);
         let runs = 0;
         win.__inj.register("a", WATCH, () => runs++);
         expect(runs).toBe(1);
     });
 
-    it("does not run one whose pattern does not match", () => {
-        const win = makeWindow(HOME);
+    it("does not run one whose pattern does not match", async () => {
+        const win = await makeWindow(HOME);
         let runs = 0;
         win.__inj.register("a", WATCH, () => runs++);
         expect(runs).toBe(0);
     });
 
-    it("a script with no patterns runs nowhere", () => {
-        const win = makeWindow(WATCH_1);
+    it("a script with no patterns runs nowhere", async () => {
+        const win = await makeWindow(WATCH_1);
         let runs = 0;
         win.__inj.register("a", [], () => runs++);
         expect(runs).toBe(0);
     });
 
-    it("a wildcard script runs everywhere", () => {
-        const win = makeWindow("https://example.com/anything");
+    it("a wildcard script runs everywhere", async () => {
+        const win = await makeWindow("https://example.com/anything");
         let runs = 0;
         win.__inj.register("a", ANY, () => runs++);
         expect(runs).toBe(1);
@@ -65,8 +65,8 @@ describe("registration and matching", () => {
 
     // The case Layer A structurally cannot handle: an SPA route change into a
     // matching URL with no new document. This is why the guard exists at all.
-    it("starts a script when an SPA route change makes it match", () => {
-        const win = makeWindow(HOME);
+    it("starts a script when an SPA route change makes it match", async () => {
+        const win = await makeWindow(HOME);
         let runs = 0;
         win.__inj.register("a", WATCH, () => runs++);
         expect(runs).toBe(0);
@@ -75,8 +75,8 @@ describe("registration and matching", () => {
         expect(runs).toBe(1);
     });
 
-    it("stops and cleans up when a route change makes it stop matching", () => {
-        const win = makeWindow(WATCH_1);
+    it("stops and cleans up when a route change makes it stop matching", async () => {
+        const win = await makeWindow(WATCH_1);
         let cleaned = 0;
         win.__inj.register("a", WATCH, (GM) => GM.onCleanup(() => cleaned++));
         expect(cleaned).toBe(0);
@@ -85,8 +85,8 @@ describe("registration and matching", () => {
         expect(cleaned).toBe(1);
     });
 
-    it("re-runs when the pattern matches again after not matching", () => {
-        const win = makeWindow(WATCH_1);
+    it("re-runs when the pattern matches again after not matching", async () => {
+        const win = await makeWindow(WATCH_1);
         let runs = 0;
         win.__inj.register("a", WATCH, () => runs++);
 
@@ -101,8 +101,8 @@ describe("registration and matching", () => {
  * The reason it departs is in these tests.
  */
 describe("re-entry contract", () => {
-    it("does NOT re-run while the pattern keeps matching", () => {
-        const win = makeWindow(WATCH_1);
+    it("does NOT re-run while the pattern keeps matching", async () => {
+        const win = await makeWindow(WATCH_1);
         let runs = 0;
         win.__inj.register("a", SITE, () => runs++);
 
@@ -113,8 +113,8 @@ describe("re-entry contract", () => {
         expect(runs, "re-running here is what doubles a pasted script's listeners").toBe(1);
     });
 
-    it("listeners do not accumulate across route changes", () => {
-        const win = makeWindow(WATCH_1);
+    it("listeners do not accumulate across route changes", async () => {
+        const win = await makeWindow(WATCH_1);
         let fired = 0;
         win.__inj.register("a", SITE, () => {
             win.addEventListener("custom", () => fired++);
@@ -128,8 +128,8 @@ describe("re-entry contract", () => {
         expect(fired, "one handler, not six").toBe(1);
     });
 
-    it("offers onRouteChange for scripts that do want per-route work", () => {
-        const win = makeWindow(WATCH_1);
+    it("offers onRouteChange for scripts that do want per-route work", async () => {
+        const win = await makeWindow(WATCH_1);
         const seen = [];
         win.__inj.register("a", SITE, (GM) => {
             GM.onRouteChange((href) => seen.push(href));
@@ -144,8 +144,8 @@ describe("re-entry contract", () => {
         ]);
     });
 
-    it("does not fire onRouteChange for a script that just started", () => {
-        const win = makeWindow(HOME);
+    it("does not fire onRouteChange for a script that just started", async () => {
+        const win = await makeWindow(HOME);
         const seen = [];
         win.__inj.register("a", WATCH, (GM) => {
             GM.onRouteChange((href) => seen.push(href));
@@ -155,8 +155,8 @@ describe("re-entry contract", () => {
         expect(seen, "its body just ran for this very route").toEqual([]);
     });
 
-    it("drops route handlers when the script stops", () => {
-        const win = makeWindow(WATCH_1);
+    it("drops route handlers when the script stops", async () => {
+        const win = await makeWindow(WATCH_1);
         const seen = [];
         win.__inj.register("a", WATCH, (GM) => {
             GM.onRouteChange((href) => seen.push(href));
@@ -171,8 +171,8 @@ describe("re-entry contract", () => {
         ]);
     });
 
-    it("runs cleanups in reverse order", () => {
-        const win = makeWindow(WATCH_1);
+    it("runs cleanups in reverse order", async () => {
+        const win = await makeWindow(WATCH_1);
         const order = [];
         win.__inj.register("a", WATCH, (GM) => {
             GM.onCleanup(() => order.push("first"));
@@ -183,8 +183,8 @@ describe("re-entry contract", () => {
         expect(order).toEqual(["second", "first"]);
     });
 
-    it("re-registering the same id tears the old one down first", () => {
-        const win = makeWindow(WATCH_1);
+    it("re-registering the same id tears the old one down first", async () => {
+        const win = await makeWindow(WATCH_1);
         let cleaned = 0;
         win.__inj.register("a", WATCH, (GM) => GM.onCleanup(() => cleaned++));
         // What "run on current page now" does after an edit.
@@ -194,8 +194,8 @@ describe("re-entry contract", () => {
 });
 
 describe("GM surface", () => {
-    it("addStyle injects a style element and removes it on cleanup", () => {
-        const win = makeWindow(WATCH_1);
+    it("addStyle injects a style element and removes it on cleanup", async () => {
+        const win = await makeWindow(WATCH_1);
         win.__inj.register("a", WATCH, (GM) => {
             GM.addStyle("body { color: red }");
         });
@@ -208,8 +208,8 @@ describe("GM surface", () => {
         ).toBe(0);
     });
 
-    it("exposes the script id via info", () => {
-        const win = makeWindow(WATCH_1);
+    it("exposes the script id via info", async () => {
+        const win = await makeWindow(WATCH_1);
         let seen = null;
         win.__inj.register("my-script", WATCH, (GM) => {
             seen = GM.info.id;
@@ -217,8 +217,8 @@ describe("GM surface", () => {
         expect(seen).toBe("my-script");
     });
 
-    it("a throwing script does not stop the others", () => {
-        const win = makeWindow(WATCH_1);
+    it("a throwing script does not stop the others", async () => {
+        const win = await makeWindow(WATCH_1);
         let second = 0;
         win.__inj.register("bad", WATCH, () => {
             throw new Error("boom");
@@ -227,8 +227,8 @@ describe("GM surface", () => {
         expect(second).toBe(1);
     });
 
-    it("a script that throws still has its cleanups run", () => {
-        const win = makeWindow(WATCH_1);
+    it("a script that throws still has its cleanups run", async () => {
+        const win = await makeWindow(WATCH_1);
         let cleaned = 0;
         win.__inj.register("bad", WATCH, (GM) => {
             GM.onCleanup(() => cleaned++);
@@ -238,8 +238,8 @@ describe("GM surface", () => {
         expect(cleaned).toBe(1);
     });
 
-    it("a throwing cleanup does not block the rest", () => {
-        const win = makeWindow(WATCH_1);
+    it("a throwing cleanup does not block the rest", async () => {
+        const win = await makeWindow(WATCH_1);
         let cleaned = 0;
         win.__inj.register("a", WATCH, (GM) => {
             GM.onCleanup(() => cleaned++);
@@ -251,8 +251,8 @@ describe("GM surface", () => {
         expect(cleaned).toBe(1);
     });
 
-    it("survives the absence of the native bridge", () => {
-        const win = makeWindow(WATCH_1);
+    it("survives the absence of the native bridge", async () => {
+        const win = await makeWindow(WATCH_1);
         expect(() => {
             win.__inj.register("a", ANY, (GM) => GM.log("hello"));
         }).not.toThrow();

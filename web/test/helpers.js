@@ -21,11 +21,24 @@ export const fixture = JSON.parse(
  * shared jsdom cannot change origin (cross-origin `replaceState` throws). Each
  * test gets the origin it needs instead of contorting around one.
  */
-export function makeWindow(url) {
+export async function makeWindow(url) {
     const dom = new JSDOM("<!doctype html><html><head></head><body></body></html>", {
         url,
         runScripts: "dangerously"
     });
+
+    // jsdom starts at readyState "loading" and reaches "complete" a tick later.
+    // Waiting matters: the runtime honours @run-at, so a document-end script
+    // registered against a still-loading document correctly defers — and a
+    // synchronous assertion right after would see nothing. A real page in these
+    // tests has finished loading, so the window should behave that way too.
+    if (dom.window.document.readyState !== "complete") {
+        await new Promise((resolve) => {
+            dom.window.addEventListener("load", resolve, { once: true });
+            setTimeout(resolve, 500);
+        });
+    }
+
     const script = dom.window.document.createElement("script");
     script.textContent = preludeSource;
     dom.window.document.head.appendChild(script);

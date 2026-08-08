@@ -16,5 +16,5 @@
 GM_addStyle("ytd-reel-shelf-renderer { display: none }");
 GM_log("hid the shelf");
 /* ---- user source ends ---- */
-    });
+    }, "document-start");
 })();

@@ -101,17 +101,25 @@ struct ScriptEditorView: View {
         }
     }
 
-    /// A new script starts from something that already runs. An empty editor
-    /// on a phone means typing a metadata block from memory.
+    /// A new script starts from something that already runs. An empty editor on
+    /// a phone means typing a metadata block from memory.
+    ///
+    /// `document-end`, not `document-start`. At document-start there is no
+    /// `document.body` yet, so the first thing most people write —
+    /// `document.body.style...` — throws. Shipping document-start in the
+    /// template is what made issue #32 look like "scripts do nothing".
+    /// document-start is for overriding page behaviour and is opt-in.
     static let template = """
         // ==UserScript==
         // @name        New script
         // @match       *://*.example.com/*
-        // @run-at      document-start
+        // @run-at      document-end
         // @world       page
         // ==/UserScript==
 
-        GM_log("hello from my script");
+        // Runs once the page's DOM exists.
+        document.body.style.outline = "3px solid magenta";
+        GM_log("it ran on " + location.hostname);
         """
 }
 

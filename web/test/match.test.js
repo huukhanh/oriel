@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { makeWindow, fixture } from "./helpers.js";
 
 /**
@@ -12,7 +12,11 @@ import { makeWindow, fixture } from "./helpers.js";
  * parser produces the `descriptors` entries; this suite feeds those same
  * descriptors through the JS matcher and asserts the same verdicts.
  */
-const inj = makeWindow("https://example.org/").__inj;
+// Only the pure matcher is needed here, not a live document.
+let inj;
+beforeAll(async () => {
+    inj = (await makeWindow("https://example.org/")).__inj;
+});
 
 describe("match guard agrees with Swift", () => {
     it("has a descriptor for every pattern used in the table", () => {
