@@ -193,6 +193,11 @@ final class AppModel: ObservableObject {
         persist()
     }
 
+    func removeRecent(url: String) {
+        state.recents.remove(url: url)
+        persist()
+    }
+
     func deleteBookmark(id: String) {
         state.bookmarks.removeAll { $0.id == id }
         persist()
@@ -203,6 +208,16 @@ final class AppModel: ObservableObject {
     func load(_ url: URL) {
         currentURL = url
         webView?.load(URLRequest(url: url))
+    }
+
+    /// Recorded when a navigation finishes, not when it starts — a page that
+    /// failed to load is not somewhere the user got to.
+    func recordVisit(url: URL?, title: String) {
+        guard let url else {
+            return
+        }
+        state.recents.record(url: url.absoluteString, title: title)
+        persist()
     }
 
     func goBack() {

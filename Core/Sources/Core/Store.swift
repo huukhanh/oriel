@@ -16,6 +16,8 @@ public struct AppState: Hashable, Sendable, Codable {
     public var builtinState: [String: BuiltinState]
     /// `GM_setValue` data, keyed by script id then by key.
     public var scriptValues: [String: [String: String]]
+    /// Recently visited pages, for the home screen.
+    public var recents: RecentURLs
 
     public init(
         version: Int = AppState.currentVersion,
@@ -23,7 +25,8 @@ public struct AppState: Hashable, Sendable, Codable {
         bookmarks: [Bookmark] = AppState.defaultBookmarks,
         settings: Settings = Settings(),
         builtinState: [String: BuiltinState] = [:],
-        scriptValues: [String: [String: String]] = [:]
+        scriptValues: [String: [String: String]] = [:],
+        recents: RecentURLs = RecentURLs()
     ) {
         self.version = version
         self.scripts = scripts
@@ -31,6 +34,7 @@ public struct AppState: Hashable, Sendable, Codable {
         self.settings = settings
         self.builtinState = builtinState
         self.scriptValues = scriptValues
+        self.recents = recents
     }
 
     /// A launcher with nothing in it looks broken on first run.
@@ -58,6 +62,7 @@ public struct AppState: Hashable, Sendable, Codable {
         scriptValues =
             try container.decodeIfPresent([String: [String: String]].self, forKey: .scriptValues)
             ?? [:]
+        recents = try container.decodeIfPresent(RecentURLs.self, forKey: .recents) ?? RecentURLs()
     }
 }
 

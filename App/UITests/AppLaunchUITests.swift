@@ -31,20 +31,74 @@ final class AppLaunchUITests: XCTestCase {
     /// a bad store path, a missing bundle resource — fails here and nowhere
     /// else in this project.
     func testAppLaunchesAndShowsTheBrowser() {
+        // The toolbar, not the address bar: the address bar is hidden by
+        // default now (#33), so its absence is correct rather than a crash.
         XCTAssertTrue(
-            app.textFields["addressField"].waitForExistence(timeout: 20),
-            "the browser chrome never appeared — the app probably trapped on launch"
+            app.buttons["toolbar.home"].waitForExistence(timeout: 20),
+            "the toolbar never appeared — the app probably trapped on launch"
         )
     }
 
+    /// #33: a fresh install should not show the address bar.
+    func testAddressBarIsHiddenOnAFreshInstall() {
+        XCTAssertTrue(app.buttons["toolbar.home"].waitForExistence(timeout: 20))
+        XCTAssertFalse(
+            app.textFields["addressField"].exists,
+            "the address bar should be off by default — it is a debugging affordance"
+        )
+    }
+
+    /// #33: and the setting must bring it back, without a restart.
+    func testTheSettingShowsTheAddressBar() {
+        XCTAssertTrue(app.buttons["toolbar.home"].waitForExistence(timeout: 20))
+        app.buttons["toolbar.settings"].tap()
+
+        let toggle = app.switches["Show address bar (debug)"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10), "the toggle is missing from Settings")
+
+        let before = toggle.value as? String
+        // Tap the right-hand side, where the switch actually is. A plain
+        // `.tap()` on a SwiftUI Form row lands on the label and does nothing —
+        // which is what the previous run proved, by reporting the value
+        // unchanged rather than the address bar missing.
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+
+        // Separating these two matters: if the switch never flipped, the fault
+        // is the tap; if it flipped and the bar stayed hidden, the fault is the
+        // app not reacting to the setting. Asserting only the end state cannot
+        // tell them apart.
+        let after = toggle.value as? String
+        XCTAssertNotEqual(before, after, "tapping the switch did not change it (\(before ?? "nil"))")
+
+        app.buttons["Done"].tap()
+
+        XCTAssertTrue(
+            app.textFields["addressField"].waitForExistence(timeout: 10),
+            "the switch flipped but the address bar stayed hidden"
+        )
+    }
+
+    /// #34: Home has to be reachable from a loaded page, and has to offer URL
+    /// entry — with the address bar hidden it is the only way to another site.
+    func testHomeButtonOpensURLEntry() {
+        XCTAssertTrue(app.buttons["toolbar.home"].waitForExistence(timeout: 20))
+        app.buttons["toolbar.home"].tap()
+
+        XCTAssertTrue(
+            app.textFields["home.addressField"].waitForExistence(timeout: 10),
+            "the home screen has no URL field"
+        )
+        XCTAssertTrue(app.staticTexts["YouTube"].exists || app.buttons["YouTube"].exists)
+    }
+
     func testToolbarIsPresent() {
-        XCTAssertTrue(app.textFields["addressField"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["toolbar.home"].waitForExistence(timeout: 20))
         for identifier in [
             "toolbar.reload",
             "toolbar.pip",
             "toolbar.scripts",
             "toolbar.log",
-            "toolbar.bookmarks",
+            "toolbar.home",
             "toolbar.settings",
         ] {
             XCTAssertTrue(
@@ -58,7 +112,7 @@ final class AppLaunchUITests: XCTestCase {
     /// `ScriptCatalog.merge`, and onto the screen. A missing resource shows up
     /// here as an empty list.
     func testScriptsSheetListsTheBuiltIns() {
-        XCTAssertTrue(app.textFields["addressField"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["toolbar.home"].waitForExistence(timeout: 20))
         app.buttons["toolbar.scripts"].tap()
 
         XCTAssertTrue(
@@ -71,7 +125,7 @@ final class AppLaunchUITests: XCTestCase {
 
     /// §4.2's split has to be visible, not just implemented.
     func testSettingsSeparatesReloadingTogglesFromLiveOnes() {
-        XCTAssertTrue(app.textFields["addressField"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["toolbar.home"].waitForExistence(timeout: 20))
         app.buttons["toolbar.settings"].tap()
 
         // Matched case-insensitively on a substring: a Form section header is
@@ -92,14 +146,14 @@ final class AppLaunchUITests: XCTestCase {
     }
 
     func testLogOpensAndIsEmptyOnACleanLaunch() {
-        XCTAssertTrue(app.textFields["addressField"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["toolbar.home"].waitForExistence(timeout: 20))
         app.buttons["toolbar.log"].tap()
         XCTAssertTrue(app.staticTexts["No output yet"].waitForExistence(timeout: 10))
     }
 
     func testBookmarksSheetOpens() {
-        XCTAssertTrue(app.textFields["addressField"].waitForExistence(timeout: 20))
-        app.buttons["toolbar.bookmarks"].tap()
+        XCTAssertTrue(app.buttons["toolbar.home"].waitForExistence(timeout: 20))
+        app.buttons["toolbar.home"].tap()
         // A SwiftUI Button is a button, not a staticText — the seeded default,
         // so an empty launcher on first run fails here.
         XCTAssertTrue(app.buttons["YouTube"].waitForExistence(timeout: 15))
@@ -107,7 +161,7 @@ final class AppLaunchUITests: XCTestCase {
 
     /// The authoring loop, end to end through the real UI.
     func testCreatingAScriptFromTheEditor() {
-        XCTAssertTrue(app.textFields["addressField"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["toolbar.home"].waitForExistence(timeout: 20))
         app.buttons["toolbar.scripts"].tap()
         XCTAssertTrue(app.buttons["New"].waitForExistence(timeout: 10))
         app.buttons["New"].tap()

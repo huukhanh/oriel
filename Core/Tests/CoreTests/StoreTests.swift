@@ -62,6 +62,18 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(settings.allowsInlineMediaPlayback, "else video is fullscreen-only")
         XCTAssertTrue(settings.usesPersistentDataStore, "else logins do not survive relaunch")
         XCTAssertTrue(settings.allowsPictureInPicture)
+        XCTAssertFalse(
+            settings.showAddressBar,
+            "hidden by default — it is a debugging affordance, not the main UI"
+        )
+    }
+
+    /// Showing the address bar must not throw away the page: it is chrome, not
+    /// a WKWebViewConfiguration flag.
+    func testAddressBarIsLiveChangeable() {
+        var changed = Settings()
+        changed.showAddressBar = true
+        XCTAssertFalse(changed.requiresWebViewRebuild(comparedTo: Settings()))
     }
 
     private struct Mutation {
@@ -79,6 +91,7 @@ final class SettingsTests: XCTestCase {
 
     private static let liveMutations: [Mutation] = [
         Mutation(name: "useDesktopUserAgent") { $0.useDesktopUserAgent.toggle() },
+        Mutation(name: "showAddressBar") { $0.showAddressBar.toggle() },
         Mutation(name: "disableIdleTimerDuringPlayback") {
             $0.disableIdleTimerDuringPlayback.toggle()
         },

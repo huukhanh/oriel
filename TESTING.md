@@ -110,6 +110,12 @@ Select your iPhone, set **Signing & Capabilities → Team** to your personal tea
 press ⌘R.
 </details>
 
+### The address bar is hidden
+
+By design — it makes the app feel like an app rather than a browser. Use the
+**house** button to go somewhere else, and turn on **Settings → Show address bar
+(debug)** when you are working on a script.
+
 ### First launch: "Untrusted Developer"
 
 Expected with a personal signature. **Settings → General → VPN & Device
@@ -123,11 +129,12 @@ Each step names how it fails, because "it didn't work" is not actionable.
 
 | # | Do this | Expect | If it fails |
 |---|---|---|---|
-| 1 | Launch Oriel | Address bar on top, YouTube loading, six buttons along the bottom | Immediate crash → not signed correctly; reinstall |
+| 1 | Launch Oriel | YouTube loading, six buttons along the bottom, **no address bar** | Immediate crash → not signed correctly; reinstall |
 | 2 | Tap the **lines** button (Log) | Empty — *"No output yet"* | A red `prelude.js is missing from the bundle` means the build is broken. Report it; nothing below will work |
 | 3 | Tap the **{}** button | **"Keep playing in background"** and **"Force inline playback"**, both on, both marked `built-in` | An empty list means the scripts did not reach the bundle |
-| 4 | Type `example.com`, press Go | Loads `https://example.com` | — |
-| 5 | Type `hello world`, press Go | A DuckDuckGo **search**, not a failed navigation | — |
+| 4 | Tap the **house** button, type `example.com`, press Go | Loads `https://example.com` | — |
+| 5 | House button again, type `hello world` | A DuckDuckGo **search**, not a failed navigation | — |
+| 6 | House button again | The site you just visited is under **Recent** | — |
 
 All five passing means the app and its injection engine work.
 
@@ -190,8 +197,9 @@ your **iPhone model and iOS version** — behaviour differs across both.
 
 ## 5. Writing a script (the point of the app)
 
-1. `{}` → **New**. A working template appears.
-2. Change `@match` to `*://*.example.com/*` and the body to `GM_log("it ran")`.
+1. `{}` → **New**. The template already changes the page, so it demonstrates
+   itself.
+2. Change `@match` to `*://*.example.com/*`.
 3. Tap **Run on this page now** — no save, no reload.
 4. Open the Log. Expect `it ran`.
 5. Go to `wikipedia.org` and reload. Expect **nothing** — the match guard is
@@ -199,6 +207,15 @@ your **iPhone model and iOS version** — behaviour differs across both.
 6. Type a broken `@match` such as `nonsense`. Expect a warning naming the line,
    and the list showing **"matches nothing — will never run"**. It must never
    silently match everything.
+
+**If a script throws**, the Log button in the toolbar turns into an orange
+warning with a count. You do not have to go looking.
+
+**`@run-at` matters more than it looks.** `document-end` is the default and is
+what you want for anything that reads or changes the page — at
+`document-start` there is no `document.body` yet, so a DOM tweak throws. Use
+`document-start` only to override page behaviour before the site's own scripts
+run.
 
 Pasted Tampermonkey scripts generally work as-is. Differences are in
 [`docs/userscript-api.md`](docs/userscript-api.md) — most importantly

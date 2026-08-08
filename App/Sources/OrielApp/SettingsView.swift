@@ -23,6 +23,7 @@ struct SettingsView: View {
                 }
 
                 Section("Applies immediately") {
+                    toggle("Show address bar (debug)", \.showAddressBar)
                     toggle("Desktop site", \.useDesktopUserAgent)
                     toggle("Keep screen awake while playing", \.disableIdleTimerDuringPlayback)
                     toggle("Background audio", \.enableBackgroundAudio)

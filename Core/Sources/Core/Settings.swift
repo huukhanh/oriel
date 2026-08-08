@@ -28,6 +28,9 @@ public struct Settings: Hashable, Sendable, Codable {
     // MARK: - Live settings (safe to change on an existing webview)
 
     public var useDesktopUserAgent: Bool
+    /// Off by default: the address bar makes this feel like a browser rather
+    /// than an app, and it is mainly useful while debugging a script.
+    public var showAddressBar: Bool
     /// Keeps the screen awake while media plays.
     public var disableIdleTimerDuringPlayback: Bool
     public var enableBackgroundAudio: Bool
@@ -41,6 +44,7 @@ public struct Settings: Hashable, Sendable, Codable {
         usesPersistentDataStore: Bool = true,
         allowsJavaScript: Bool = true,
         useDesktopUserAgent: Bool = false,
+        showAddressBar: Bool = false,
         disableIdleTimerDuringPlayback: Bool = true,
         enableBackgroundAudio: Bool = true,
         sleepTimerMinutes: Int = 0
@@ -51,6 +55,7 @@ public struct Settings: Hashable, Sendable, Codable {
         self.usesPersistentDataStore = usesPersistentDataStore
         self.allowsJavaScript = allowsJavaScript
         self.useDesktopUserAgent = useDesktopUserAgent
+        self.showAddressBar = showAddressBar
         self.disableIdleTimerDuringPlayback = disableIdleTimerDuringPlayback
         self.enableBackgroundAudio = enableBackgroundAudio
         self.sleepTimerMinutes = sleepTimerMinutes
