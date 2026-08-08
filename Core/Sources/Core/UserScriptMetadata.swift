@@ -64,7 +64,7 @@ public struct UserScriptMetadata: Hashable, Sendable, Codable {
         version: String? = nil,
         namespace: String? = nil,
         matches: [MatchPattern] = [],
-        runAt: RunAt = .documentStart,
+        runAt: RunAt = .documentEnd,
         world: ScriptWorld = .page,
         noFrames: Bool = false,
         warnings: [MetadataWarning] = [],
@@ -194,7 +194,7 @@ public struct UserScriptMetadata: Hashable, Sendable, Codable {
                         MetadataWarning(
                             key: key,
                             message:
-                                "`\(value)` is not a known @run-at; using document-start.",
+                                "`\(value)` is not a known @run-at; using document-end.",
                             line: lineNumber
                         )
                     )
@@ -243,7 +243,9 @@ public struct UserScriptMetadata: Hashable, Sendable, Codable {
             result.warnings.append(
                 MetadataWarning(
                     key: "run-at",
-                    message: "not specified; using document-start.",
+                    message:
+                        "not specified; using document-end, which is after the page's DOM "
+                        + "exists. Use document-start only to override page behaviour.",
                     line: openIndex + 1
                 )
             )

@@ -65,6 +65,9 @@ final class AppModel: ObservableObject {
     }
 
     func record(_ entry: LogEntry) {
+        if entry.level == "error" {
+            errorCount += 1
+        }
         log.append(entry)
         if log.count > AppModel.maxLogEntries {
             log.removeFirst(log.count - AppModel.maxLogEntries)
@@ -73,6 +76,18 @@ final class AppModel: ObservableObject {
 
     func clearLog() {
         log.removeAll()
+        errorCount = 0
+    }
+
+    /// Errors since the log was last opened.
+    ///
+    /// A script that throws already wrote to the log, but nothing on screen
+    /// said so — which is most of why issue #32 read as "no error, no way to
+    /// tell". The toolbar shows this as a badge.
+    @Published private(set) var errorCount: Int = 0
+
+    func acknowledgeErrors() {
+        errorCount = 0
     }
 
     // MARK: - Derived

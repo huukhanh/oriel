@@ -40,7 +40,13 @@ final class UserScriptMetadataTests: XCTestCase {
         XCTAssertTrue(metadata.matches[0].matches("https://m.youtube.com/watch?v=1"))
     }
 
-    func testDefaultsAreTheOnesTheMediaScriptsNeed() {
+    /// The default changed after issue #32: a script with no `@run-at` used to
+    /// get `document-start`, where `document.body` is still nil — so the first
+    /// thing most people write threw before doing anything.
+    ///
+    /// The media built-ins are unaffected because they declare document-start
+    /// explicitly, which `BuiltinScriptTests` enforces.
+    func testUnspecifiedRunAtIsTheSafeOne() {
         let metadata = UserScriptMetadata.parse(
             """
             // ==UserScript==
@@ -48,9 +54,32 @@ final class UserScriptMetadataTests: XCTestCase {
             // ==/UserScript==
             """
         )
-        XCTAssertEqual(metadata.runAt, .documentStart, "document-start is mandatory for §7 scripts")
+        XCTAssertEqual(
+            metadata.runAt,
+            .documentEnd,
+            "a script that touches the DOM is the common case; beating the page's own "
+                + "listeners is the expert case that says so explicitly"
+        )
         XCTAssertEqual(metadata.world, .page)
         XCTAssertFalse(metadata.noFrames)
+    }
+
+    func testExplicitRunAtIsHonoured() {
+        for (text, expected) in [
+            ("document-start", RunAt.documentStart),
+            ("document-end", RunAt.documentEnd),
+            ("document-idle", RunAt.documentIdle),
+        ] {
+            let metadata = UserScriptMetadata.parse(
+                """
+                // ==UserScript==
+                // @match *://example.com/*
+                // @run-at \(text)
+                // ==/UserScript==
+                """
+            )
+            XCTAssertEqual(metadata.runAt, expected, "@run-at \(text) was not honoured")
+        }
     }
 
     /// Defaults are correct but silent, so the parser says when it assumed one.
@@ -121,7 +150,7 @@ final class UserScriptMetadataTests: XCTestCase {
             // ==/UserScript==
             """
         )
-        XCTAssertEqual(metadata.runAt, .documentStart)
+        XCTAssertEqual(metadata.runAt, .documentEnd)
         XCTAssertEqual(metadata.world, .page)
         XCTAssertTrue(warning(metadata, key: "run-at")?.message.contains("whenever") ?? false)
         XCTAssertTrue(warning(metadata, key: "world")?.message.contains("sandbox") ?? false)

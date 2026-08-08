@@ -88,5 +88,5 @@
 })();
 
 /* ---- user source ends ---- */
-    });
+    }, "document-start");
 })();
