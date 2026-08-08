@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: How to install and test
+    url: https://github.com/huukhanh/oriel/blob/main/TESTING.md
+    about: Install steps, the smoke test, and what each failure means.
+  - name: Userscript API
+    url: https://github.com/huukhanh/oriel/blob/main/docs/userscript-api.md
+    about: Supported metadata keys, the GM shim, and how this differs from Tampermonkey.
