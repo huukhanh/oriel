@@ -55,12 +55,22 @@ final class AppLaunchUITests: XCTestCase {
 
         let toggle = app.switches["Show address bar (debug)"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 10), "the toggle is missing from Settings")
+
+        let before = toggle.value as? String
         toggle.tap()
+
+        // Separating these two matters: if the switch never flipped, the fault
+        // is the tap; if it flipped and the bar stayed hidden, the fault is the
+        // app not reacting to the setting. Asserting only the end state cannot
+        // tell them apart.
+        let after = toggle.value as? String
+        XCTAssertNotEqual(before, after, "tapping the switch did not change it (\(before ?? "nil"))")
+
         app.buttons["Done"].tap()
 
         XCTAssertTrue(
             app.textFields["addressField"].waitForExistence(timeout: 10),
-            "toggling it on did not reveal the address bar"
+            "the switch flipped but the address bar stayed hidden"
         )
     }
 
