@@ -16,9 +16,16 @@ Every push to `main` builds an installable `.ipa`. Two ways to get it:
 
 **From the latest build** — any commit, needs a GitHub login:
 
-> Actions → **release** → newest run → Artifacts → `Oriel-unsigned-ipa`
+> Actions → **release** → newest run → Artifacts
 
 The artifact downloads as a `.zip` containing the `.ipa`; unzip it first.
+
+Each release carries two files:
+
+| File | For |
+|---|---|
+| `Oriel-unsigned.ipa` | A real iPhone — sideload it, or use `scripts/install-device.sh` |
+| `Oriel-Simulator.zip` | The iOS Simulator on a Mac — `scripts/run-simulator.sh`, no Apple ID needed |
 
 ### Why it is unsigned, and what that means for you
 
@@ -55,18 +62,53 @@ Same flow: <https://altstore.io>
 <https://sideloadly.io> — drag the `.ipa` in, enter your Apple ID, plug in the
 phone, click Start.
 
-### Option D — You have a Mac with Xcode
+### Option D — You have a Mac
 
-Skip the `.ipa` entirely:
+Two one-command routes, both in `scripts/`:
+
+```sh
+git clone https://github.com/huukhanh/oriel.git && cd oriel
+
+./scripts/run-simulator.sh      # iOS Simulator. No Apple ID, no signing.
+./scripts/install-device.sh     # onto a connected iPhone.
+```
+
+**`run-simulator.sh`** downloads the simulator build from the latest release,
+boots a simulator, installs and launches it. Nothing to sign and no Apple ID at
+all — the fastest way to see the app. Add `--build` to compile this checkout
+instead of downloading.
+
+*It cannot test PiP, background audio or lock-screen behaviour* — simulator
+media behaviour does not reflect a device. That is §4, and it needs real
+hardware.
+
+**`install-device.sh`** signs the release `.ipa` with a development identity
+from your keychain and installs it over the cable. If you have never built an
+iOS app on this Mac you will not have one, and it will tell you so; in that case
+use:
+
+```sh
+./scripts/install-device.sh --build
+```
+
+which builds from source and lets Xcode handle provisioning — more reliable,
+because Xcode can register the bundle id against your Apple ID and a
+hand-signed `.ipa` cannot.
+
+Both scripts stop with a specific message and a fix when a prerequisite is
+missing, rather than half-working.
+
+<details>
+<summary>Manual Xcode route</summary>
 
 ```sh
 brew install xcodegen
-git clone https://github.com/huukhanh/oriel.git
-cd oriel/App && xcodegen generate && open Oriel.xcodeproj
+cd App && xcodegen generate && open Oriel.xcodeproj
 ```
 
 Select your iPhone, set **Signing & Capabilities → Team** to your personal team,
 press ⌘R.
+</details>
 
 ### First launch: "Untrusted Developer"
 

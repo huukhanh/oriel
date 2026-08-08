@@ -112,3 +112,49 @@ jobs:
             App/build.log
             App/test.log
           if-no-files-found: ignore
+
+  # Runs the script a Mac user is told to run, on a Mac. A helper script that
+  # has never been executed is documentation, not tooling — and its failure
+  # modes (missing simulator, unbootable runtime, app that installs but does
+  # not launch) are exactly what a person hits on their first try.
+  mac-scripts:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: scripts/run-simulator.sh --build
+        run: ./scripts/run-simulator.sh --build
+
+      - name: Confirm the app is actually installed and running
+        run: |
+          set -euo pipefail
+          DEVICE=$(xcrun simctl list devices booted -j \
+            | jq -r '[.devices[][]] | .[0].udid')
+          test -n "$DEVICE" -a "$DEVICE" != "null" || { echo "FAIL: nothing booted"; exit 1; }
+
+          # `simctl launch` succeeding only means the launch request was
+          # accepted. A crash on startup still leaves no running process, which
+          # is the failure this catches.
+          for _ in $(seq 1 10); do
+            PID=$(xcrun simctl spawn "$DEVICE" launchctl list 2>/dev/null \
+              | grep -i "com.oriel.browser" | awk '{print $1}' | head -1) || true
+            [ -n "${PID:-}" ] && [ "$PID" != "-" ] && break
+            sleep 2
+          done
+          test -n "${PID:-}" -a "${PID:-}" != "-" \
+            || { echo "FAIL: Oriel is installed but not running — it crashed on launch"; exit 1; }
+          echo "Oriel is running (pid $PID)"
+
+      - name: Reject the device script on a machine with no device
+        run: |
+          # It must fail with the message a person can act on, not a stack
+          # trace or a silent success.
+          if ./scripts/install-device.sh > out.txt 2>&1; then
+            echo "FAIL: it claimed success with no device attached"; cat out.txt; exit 1
+          fi
+          grep -q "no paired iPhone found" out.txt \
+            || { echo "FAIL: unhelpful failure message:"; cat out.txt; exit 1; }
+          echo "fails as intended:"; head -3 out.txt
