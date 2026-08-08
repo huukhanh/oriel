@@ -51,6 +51,17 @@ jobs:
         working-directory: App
         run: xcodegen generate
 
+      # The simulator build needs a device name; the archive does not, but
+      # keeping one discovery step avoids them drifting apart.
+      - name: Pick a simulator
+        id: sim
+        run: |
+          name=$(xcrun simctl list devices available -j \
+            | jq -r '[.devices[][] | select(.name | startswith("iPhone"))] | last | .name')
+          test -n "$name" -a "$name" != "null" || { xcrun simctl list devices available; exit 1; }
+          echo "Using $name"
+          echo "device=$name" >> "$GITHUB_OUTPUT"
+
       - name: Archive (unsigned, device)
         working-directory: App
         run: |
@@ -112,6 +123,43 @@ jobs:
           echo "── size ──"
           du -h "$RUNNER_TEMP/Oriel-unsigned.ipa"
 
+      # A simulator build as well: it needs no Apple ID and no signing, so it is
+      # the fastest way for anyone with a Mac to actually see the app. The
+      # device .ipa cannot serve this purpose — its arm64 device slices will not
+      # load in a simulator however it is packaged.
+      - name: Build for the simulator
+        working-directory: App
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project Oriel.xcodeproj \
+            -scheme Oriel \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
+            -derivedDataPath "$RUNNER_TEMP/sim" \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tail -15
+
+      - name: Package the simulator app
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/sim/Build/Products/Debug-iphonesimulator/Oriel.app"
+          test -d "$APP" || { echo "FAIL: no simulator .app"; exit 1; }
+          test -f "$APP/prelude.js" || { echo "FAIL: prelude.js missing"; exit 1; }
+          if ! file "$APP/Oriel" | grep -q "arm64"; then
+            echo "FAIL: unexpected architecture"; file "$APP/Oriel"; exit 1
+          fi
+          (cd "$(dirname "$APP")" && zip -qry "$RUNNER_TEMP/Oriel-Simulator.zip" Oriel.app)
+          du -h "$RUNNER_TEMP/Oriel-Simulator.zip"
+
+      - name: Upload simulator build
+        uses: actions/upload-artifact@v4
+        with:
+          name: Oriel-simulator-app
+          path: ${{ runner.temp }}/Oriel-Simulator.zip
+          retention-days: 90
+          if-no-files-found: error
+
       - name: Upload .ipa
         uses: actions/upload-artifact@v4
         with:
@@ -126,12 +174,18 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ runner.temp }}/Oriel-unsigned.ipa
+          files: |
+            ${{ runner.temp }}/Oriel-unsigned.ipa
+            ${{ runner.temp }}/Oriel-Simulator.zip
           generate_release_notes: true
           body: |
             **Unsigned build.** Sign it with your own Apple ID when installing —
             see [TESTING.md](../blob/main/TESTING.md) for the steps.
 
-            Quickest route: install [SideStore](https://sidestore.io) or
-            [AltStore](https://altstore.io), then open this `.ipa` with it.
-            A free Apple ID works; the app then needs re-signing every 7 days.
+            **On a phone:** install [SideStore](https://sidestore.io) or
+            [AltStore](https://altstore.io), then open `Oriel-unsigned.ipa`
+            with it. A free Apple ID works; re-signing is needed every 7 days.
+
+            **On a Mac:** `Oriel-Simulator.zip` runs in the iOS Simulator with
+            no Apple ID and no signing at all —
+            `scripts/run-simulator.sh` does it in one command.
