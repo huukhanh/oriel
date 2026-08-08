@@ -11,9 +11,30 @@ struct SettingsView: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.dismiss) private var dismiss
 
+    @State private var showingScripts = false
+
     var body: some View {
         NavigationStack {
             Form {
+                // First, deliberately. The reporter of #32 looked for
+                // "Settings → Custom Scripts", found nothing, and concluded
+                // scripting was broken. The toolbar's {} button is the fast
+                // path from a page; this is the one people go looking for.
+                Section("Scripts") {
+                    Button(action: { showingScripts = true }) {
+                        HStack {
+                            Text("Scripts")
+                            Spacer()
+                            Text("\(model.scripts.count)")
+                                .foregroundStyle(Color.secondary)
+                        }
+                    }
+                    .accessibilityIdentifier("settings.scripts")
+                    Text("Write or paste userscripts. Also on the {} button in the toolbar.")
+                        .font(.footnote)
+                        .foregroundStyle(Color.secondary)
+                }
+
                 Section("Reloads the page") {
                     toggle("Inline playback", \.allowsInlineMediaPlayback)
                     toggle("Picture in Picture", \.allowsPictureInPicture)
@@ -57,6 +78,10 @@ struct SettingsView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
+            }
+            .sheet(isPresented: $showingScripts) {
+                ScriptListView()
+                    .environmentObject(model)
             }
         }
     }

@@ -123,6 +123,22 @@ final class AppLaunchUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Force inline playback"].exists)
     }
 
+    /// #38: someone looking for scripting in Settings — the obvious place —
+    /// found nothing and concluded the feature was broken.
+    func testScriptsAreReachableFromSettings() {
+        XCTAssertTrue(app.buttons["toolbar.home"].waitForExistence(timeout: 20))
+        app.buttons["toolbar.settings"].tap()
+
+        let row = app.buttons["settings.scripts"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "Settings has no Scripts row")
+        row.tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Keep playing in background"].waitForExistence(timeout: 10),
+            "the Scripts row did not open the script list"
+        )
+    }
+
     /// §4.2's split has to be visible, not just implemented.
     func testSettingsSeparatesReloadingTogglesFromLiveOnes() {
         XCTAssertTrue(app.buttons["toolbar.home"].waitForExistence(timeout: 20))
