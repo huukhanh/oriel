@@ -1,0 +1,44 @@
+name: Device test result
+description: Report what happened when you ran the app on a real iPhone
+labels: ["needs-device-check"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Results from [TESTING.md §4](https://github.com/huukhanh/oriel/blob/main/TESTING.md#4-the-media-features--what-to-actually-check)
+        — the media behaviour no simulator and no CI can check.
+  - type: input
+    id: device
+    attributes:
+      label: iPhone model and iOS version
+      placeholder: iPhone 14 Pro, iOS 18.5
+    validations:
+      required: true
+  - type: dropdown
+    id: which
+    attributes:
+      label: Which test
+      options:
+        - "4.1 — page pauses itself when switching apps"
+        - "4.2 — Picture in Picture button"
+        - "4.3 — background audio with the screen locked"
+        - "3 — the two-minute smoke test"
+        - "Something else"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: |
+        For §4.3 the **timing** is the useful part — "audio died at about 25
+        seconds" and "good for 8 minutes" have different causes and imply
+        different apps.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log contents
+      description: In the app, tap the lines button then **Copy**. Paste verbatim rather than summarised.
+      render: text
