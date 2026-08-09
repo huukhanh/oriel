@@ -118,13 +118,18 @@ if [ -z "$XCODE_MAJOR" ] || [ "$XCODE_MAJOR" -lt "$MIN_XCODE_MAJOR" ] 2>/dev/nul
 Update Xcode, or install to the phone from Xcode's own Run button."
 fi
 
+# Everything below this point is about *building*. `--list` only needs
+# devicectl, so it skips ahead — a machine that can see your phone but cannot
+# build should still be able to answer "is it paired?".
+if [ "$LIST_ONLY" = 0 ]; then
+
 # The SDK has to be at least the deployment target, or the build fails with
 # something far less obvious than this.
 DEPLOYMENT_TARGET="$(
     grep -A2 'deploymentTarget:' "$REPO_ROOT/App/project.yml" 2>/dev/null \
         | grep 'iOS:' | tr -d ' "' | cut -d: -f2 || true
 )"
-SDK_VERSION="$(xcodebuild -showsdks 2>/dev/null | awk '/iphoneos/ {v=$NF} END {sub(/^iphoneos/,"",v); print v}')"
+SDK_VERSION="$(xcodebuild -showsdks 2>/dev/null | awk '/iphoneos/ {v=$NF} END {sub(/^iphoneos/,"",v); print v}' || true)"
 if [ -n "$DEPLOYMENT_TARGET" ] && [ -n "$SDK_VERSION" ]; then
     if [ "${SDK_VERSION%%.*}" -lt "${DEPLOYMENT_TARGET%%.*}" ] 2>/dev/null; then
         die "your iOS SDK ($SDK_VERSION) is older than this app's deployment target ($DEPLOYMENT_TARGET)" \
@@ -141,6 +146,8 @@ in, because hand-editing one on a machine without Xcode corrupts it.
 
     brew install xcodegen"
 fi
+
+fi   # end of build-only preflight
 
 mkdir -p "$WORK"
 
