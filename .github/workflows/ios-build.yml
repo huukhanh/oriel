@@ -148,13 +148,55 @@ jobs:
             || { echo "FAIL: Oriel is installed but not running — it crashed on launch"; exit 1; }
           echo "Oriel is running (pid $PID)"
 
-      - name: Reject the device script on a machine with no device
+      # The device script's failure paths are what people actually hit, and a
+      # runner with no phone attached is the right place to exercise them: a
+      # script that dies with a stack trace is worse than one that does not run.
+      - name: install-device.sh — preconditions and flags
         run: |
-          # It must fail with the message a person can act on, not a stack
-          # trace or a silent success.
+          set -euo pipefail
+          fail() { echo "FAIL: $1"; cat out.txt 2>/dev/null; exit 1; }
+
+          # --help must work and exit 0, or nobody can discover the flags.
+          ./scripts/install-device.sh --help > out.txt 2>&1 || fail "--help exited non-zero"
+          grep -q -- "--device" out.txt || fail "--help does not list the flags"
+
+          # --list must succeed even with nothing paired. It is the first thing
+          # the guide tells people to run, so it cannot be an error path.
+          ./scripts/install-device.sh --list > out.txt 2>&1 || fail "--list exited non-zero"
+          grep -qi "no paired devices\|UDID" out.txt || fail "--list printed nothing useful"
+
+          # No device: must fail, and must say what to do about it.
           if ./scripts/install-device.sh > out.txt 2>&1; then
-            echo "FAIL: it claimed success with no device attached"; cat out.txt; exit 1
+            fail "claimed success with no device attached"
           fi
-          grep -q "no paired iPhone found" out.txt \
-            || { echo "FAIL: unhelpful failure message:"; cat out.txt; exit 1; }
-          echo "fails as intended:"; head -3 out.txt
+          grep -q "no paired iPhone or iPad found" out.txt || fail "unhelpful message"
+          grep -q "Developer Mode" out.txt || fail "does not mention the usual cause"
+          grep -q "DEVICE-SETUP" out.txt || fail "does not point at the guide"
+
+          # An unknown flag must be rejected, not silently ignored — silently
+          # ignoring one means a typo'd --device installs to the wrong phone.
+          if ./scripts/install-device.sh --nope > out.txt 2>&1; then
+            fail "accepted an unknown flag"
+          fi
+          grep -q "unknown option" out.txt || fail "unclear message for a bad flag"
+
+          # A flag needing a value must not swallow the next argument.
+          if ./scripts/install-device.sh --device > out.txt 2>&1; then
+            fail "accepted --device with no value"
+          fi
+
+          echo "all precondition paths behave"
+
+      - name: The guide is linked and its promises exist
+        run: |
+          set -euo pipefail
+          test -f docs/DEVICE-SETUP.md || { echo "FAIL: guide missing"; exit 1; }
+          grep -q "DEVICE-SETUP.md" README.md \
+            || { echo "FAIL: the guide is not linked from the README"; exit 1; }
+          # Every flag the guide documents must actually be accepted, or the
+          # guide is lying to someone who cannot easily tell.
+          for flag in --list --clean --build-only --logs --release --ipa; do
+            grep -q -- "$flag" scripts/install-device.sh \
+              || { echo "FAIL: guide documents $flag but the script has no such flag"; exit 1; }
+          done
+          echo "guide and script agree"
