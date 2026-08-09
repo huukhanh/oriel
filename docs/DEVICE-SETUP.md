@@ -77,30 +77,38 @@ Wi-Fi installs are slower and drop out more; cable is worth it while iterating.
 
 ## 4. Signing
 
-Automatic signing is already configured (`CODE_SIGN_STYLE: Automatic` in
-`App/project.yml`), so normally you only pick a team once:
+**You should not have to do anything here.** The script finds your team from
+the keychain, passes it to `xcodebuild`, and remembers it in a gitignored
+`.oriel-local` so it is looked up once.
+
+All you need is an Apple ID in Xcode:
+
+1. **Xcode → Settings → Accounts → +** → Apple ID, sign in
+2. Select the account → **Manage Certificates → + → Apple Development**
+
+A free Apple ID is enough.
+
+If detection ever picks the wrong team — several accounts on one Mac — name it:
 
 ```sh
-open App/Oriel.xcodeproj
+./scripts/install-device.sh --team ABCDE12345
 ```
 
-Target **Oriel** → **Signing & Capabilities** → **Team** → your personal team.
+The Team ID is in **Xcode → Settings → Accounts**, next to the team name.
 
-> `xcodegen generate` **rewrites the project file** and resets that choice. If
-> that gets annoying, put it in `App/project.yml` instead and it survives:
-> ```yaml
-> settings:
->   base:
->     DEVELOPMENT_TEAM: XXXXXXXXXX
-> ```
-> Your team id is in Xcode → Settings → Accounts → Manage Certificates.
+> **Setting the Team in Xcode's Signing & Capabilities editor does not stick,
+> and cannot.** The script runs `xcodegen generate` before every build, which
+> rewrites `Oriel.xcodeproj` from `App/project.yml` and discards anything set
+> in the editor. That is why the team is passed on the command line instead.
+>
+> Earlier versions of this guide and of the script's own error message told you
+> to set it in the editor. That advice was a loop with no exit — fixed in
+> v0.8.0.
 
-**Bundle id collisions.** The default is `com.oriel.browser`. If someone else
-has registered it, signing fails with *"Unable to register bundle identifier"*.
-Change `PRODUCT_BUNDLE_IDENTIFIER` in `App/project.yml` to something personal
-and re-run.
-
----
+**Bundle id collisions.** The default is `com.oriel.browser`. If it is already
+registered to someone else, signing fails even with a correct team. Change
+`PRODUCT_BUNDLE_IDENTIFIER` in `App/project.yml` to something personal —
+`com.yourname.oriel` — and re-run.
 
 ## 5. Trust the certificate on the phone
 
@@ -136,7 +144,13 @@ the script works from then on.
 
 ### "Signing for 'Oriel' requires a development team"
 
-No team selected. Section 4.
+The script now detects and passes the team, so this should not appear. If it
+does, no signing identity was found at all — add an Apple ID in **Xcode →
+Settings → Accounts** and create an *Apple Development* certificate under
+Manage Certificates. Section 4.
+
+**Do not fix this by setting the Team in Xcode's editor.** It is discarded the
+next time the script runs. Use `--team ABCDE12345`.
 
 ### The app was working, now it will not open
 

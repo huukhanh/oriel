@@ -209,8 +209,16 @@ jobs:
             || { echo "FAIL: the guide is not linked from the README"; exit 1; }
           # Every flag the guide documents must actually be accepted, or the
           # guide is lying to someone who cannot easily tell.
-          for flag in --list --clean --build-only --logs --release --ipa; do
+          for flag in --list --clean --build-only --logs --release --ipa --team; do
             grep -q -- "$flag" scripts/install-device.sh \
               || { echo "FAIL: guide documents $flag but the script has no such flag"; exit 1; }
           done
+          # The guide must not tell people to set the Team in Xcode's editor:
+          # the script regenerates the project on every run and wipes it, so
+          # that advice is a loop with no exit. It was, once.
+          if grep -n "Signing & Capabilities → Team" docs/DEVICE-SETUP.md \
+              | grep -qv "does not stick"; then
+            grep -q "does not stick, and cannot" docs/DEVICE-SETUP.md \
+              || { echo "FAIL: the guide recommends an editor setting that gets wiped"; exit 1; }
+          fi
           echo "guide and script agree"
