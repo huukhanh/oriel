@@ -163,7 +163,8 @@ jobs:
           # --list must succeed even with nothing paired. It is the first thing
           # the guide tells people to run, so it cannot be an error path.
           ./scripts/install-device.sh --list > out.txt 2>&1 || fail "--list exited non-zero"
-          grep -qi "no paired devices\|UDID" out.txt || fail "--list printed nothing useful"
+          grep -qi "no paired devices\|UDID\|devicectl could not" out.txt \
+            || fail "--list printed nothing useful"
 
           # No device: must fail, and must say what to do about it.
           if ./scripts/install-device.sh > out.txt 2>&1; then

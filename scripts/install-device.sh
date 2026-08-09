@@ -149,9 +149,27 @@ mkdir -p "$WORK"
 
 step "Looking for devices"
 DEVICES_JSON="$WORK/devices.json"
-xcrun devicectl list devices --json-output "$DEVICES_JSON" >/dev/null 2>&1 \
-    || die "\`xcrun devicectl\` failed" \
-"Open Xcode once and let it finish installing components, then try again."
+DEVICECTL_ERR="$WORK/devicectl.err"
+set +e
+xcrun devicectl list devices --json-output "$DEVICES_JSON" >/dev/null 2>"$DEVICECTL_ERR"
+DEVICECTL_STATUS=$?
+set -e
+
+if [ "$DEVICECTL_STATUS" != 0 ]; then
+    # `--list` is informational and the first thing the guide tells people to
+    # run, so it reports and exits cleanly rather than failing. Anything that
+    # goes on to install still treats this as fatal.
+    if [ "$LIST_ONLY" = 1 ]; then
+        echo "  devicectl could not enumerate devices"
+        sed 's/^/    /' "$DEVICECTL_ERR" 2>/dev/null | head -5
+        note "Usually Xcode has not finished installing its components."
+        exit 0
+    fi
+    die "\`xcrun devicectl\` failed" \
+"$(head -5 "$DEVICECTL_ERR" 2>/dev/null)
+
+Open Xcode once and let it finish installing components, then try again."
+fi
 
 read_devices() {
     python3 - "$DEVICES_JSON" <<'PY'
