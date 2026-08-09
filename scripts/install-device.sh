@@ -207,34 +207,7 @@ Open Xcode once and let it finish installing components, then try again."
 fi
 
 read_devices() {
-    python3 - "$DEVICES_JSON" <<'PY'
-import json, sys
-
-try:
-    devices = json.load(open(sys.argv[1]))["result"]["devices"]
-except Exception:
-    sys.exit(0)
-
-for d in devices:
-    props = d.get("deviceProperties", {})
-    conn = d.get("connectionProperties", {})
-    hw = d.get("hardwareProperties", {})
-
-    # Physical iPhones/iPads only: a Mac shows up here too.
-    if hw.get("platform") not in ("iOS", "iPadOS"):
-        continue
-
-    name = props.get("name", "?")
-    udid = d.get("identifier", "")
-    version = props.get("osVersionNumber", "?")
-    transport = conn.get("transportType", "?")
-    paired = conn.get("pairingState", "?")
-    tunnel = conn.get("tunnelState", "?")
-    dev_mode = props.get("developerModeStatus", "?")
-
-    # Tab-separated: name and everything else can contain spaces.
-    print("\t".join([udid, name, version, transport, paired, tunnel, dev_mode]))
-PY
+    python3 "$REPO_ROOT/scripts/lib/parse-devices.py" "$DEVICES_JSON"
 }
 
 DEVICE_LINES="$(read_devices || true)"
@@ -245,10 +218,10 @@ if [ "$LIST_ONLY" = 1 ]; then
         note "See docs/DEVICE-SETUP.md for pairing and Developer Mode."
         exit 0
     fi
-    printf '\n  %-38s %-22s %-8s %-10s %s\n' "UDID" "NAME" "OS" "TRANSPORT" "DEV MODE"
-    while IFS=$'\t' read -r udid name version transport paired tunnel devmode; do
+    printf '\n  %-26s %-22s %-8s %-10s %s\n' "UDID" "NAME" "OS" "TRANSPORT" "DEV MODE"
+    while IFS=$'\t' read -r coredevice udid name version transport devmode; do
         [ -z "$udid" ] && continue
-        printf '  %-38s %-22s %-8s %-10s %s\n' "$udid" "$name" "$version" "$transport" "$devmode"
+        printf '  %-26s %-22s %-8s %-10s %s\n' "$udid" "$name" "$version" "$transport" "$devmode"
     done <<< "$DEVICE_LINES"
     echo
     exit 0
@@ -266,26 +239,33 @@ Then:
 Full walkthrough: docs/DEVICE-SETUP.md"
 
 # Select: explicit flag wins; otherwise the only device; otherwise ask.
+# Two identifiers, not interchangeable — see scripts/lib/parse-devices.py.
+#   DEVICE_ID    CoreDevice UUID, for devicectl install/launch
+#   DEVICE_UDID  hardware UDID, for xcodebuild -destination
 DEVICE_ID=""
+DEVICE_UDID=""
 DEVICE_NAME=""
 DEVICE_COUNT="$(printf '%s\n' "$DEVICE_LINES" | grep -c . || true)"
 
 if [ -n "$DEVICE_ARG" ]; then
-    while IFS=$'\t' read -r udid name version transport paired tunnel devmode; do
+    while IFS=$'\t' read -r coredevice udid name version transport devmode; do
         [ -z "$udid" ] && continue
-        if [ "$udid" = "$DEVICE_ARG" ] || [ "$name" = "$DEVICE_ARG" ]; then
-            DEVICE_ID="$udid"; DEVICE_NAME="$name"; break
+        # Accept either identifier or the name: people paste whichever they
+        # have to hand, and both are printed by --list.
+        if [ "$udid" = "$DEVICE_ARG" ] || [ "$coredevice" = "$DEVICE_ARG" ] \
+            || [ "$name" = "$DEVICE_ARG" ]; then
+            DEVICE_ID="$coredevice"; DEVICE_UDID="$udid"; DEVICE_NAME="$name"; break
         fi
     done <<< "$DEVICE_LINES"
     [ -n "$DEVICE_ID" ] || die "no paired device matches '$DEVICE_ARG'" \
 "Run --list to see UDIDs and names."
 elif [ "$DEVICE_COUNT" = 1 ]; then
-    IFS=$'\t' read -r DEVICE_ID DEVICE_NAME _ <<< "$DEVICE_LINES"
+    IFS=$'\t' read -r DEVICE_ID DEVICE_UDID DEVICE_NAME _ <<< "$DEVICE_LINES"
 else
     echo
     echo "  Several devices are paired:"
     i=0
-    while IFS=$'\t' read -r udid name version transport paired tunnel devmode; do
+    while IFS=$'\t' read -r coredevice udid name version transport devmode; do
         [ -z "$udid" ] && continue
         i=$((i + 1))
         printf '    %d) %s  (iOS %s, %s)\n' "$i" "$name" "$version" "$transport"
@@ -299,20 +279,22 @@ else
     printf '  Which one? [1-%d] ' "$i"
     read -r choice
     [ "$choice" -ge 1 ] 2>/dev/null && [ "$choice" -le "$i" ] || die "not a valid choice"
-    DEVICE_ID="$(printf '%s\n' "$DEVICE_LINES" | sed -n "${choice}p" | cut -f1)"
-    DEVICE_NAME="$(printf '%s\n' "$DEVICE_LINES" | sed -n "${choice}p" | cut -f2)"
+    CHOSEN="$(printf '%s\n' "$DEVICE_LINES" | sed -n "${choice}p")"
+    DEVICE_ID="$(printf '%s' "$CHOSEN" | cut -f1)"
+    DEVICE_UDID="$(printf '%s' "$CHOSEN" | cut -f2)"
+    DEVICE_NAME="$(printf '%s' "$CHOSEN" | cut -f3)"
 fi
 
 # Warn rather than block: these are the usual causes of a confusing failure
 # later, but devicectl is the authority and it may still work.
 DEVICE_ROW="$(printf '%s\n' "$DEVICE_LINES" | grep -F "$DEVICE_ID" || true)"
-DEV_MODE="$(printf '%s' "$DEVICE_ROW" | cut -f7)"
+DEV_MODE="$(printf '%s' "$DEVICE_ROW" | cut -f6)"
 case "$DEV_MODE" in
     enabled|"") : ;;
     *) warn "Developer Mode looks $DEV_MODE on $DEVICE_NAME.
     Settings → Privacy & Security → Developer Mode → on, then reboot." ;;
 esac
-note "device: $DEVICE_NAME  ($DEVICE_ID)"
+note "device: $DEVICE_NAME  ($DEVICE_UDID)"
 
 # ── install from a released .ipa ─────────────────────────────────────────────
 if [ "$FROM_IPA" = 1 ]; then
@@ -371,7 +353,7 @@ else
         -project "$REPO_ROOT/App/Oriel.xcodeproj" \
         -scheme "$SCHEME" \
         -configuration "$CONFIGURATION" \
-        -destination "id=$DEVICE_ID" \
+        -destination "id=$DEVICE_UDID" \
         -derivedDataPath "$DERIVED" \
         -allowProvisioningUpdates \
         build > "$BUILD_LOG" 2>&1
@@ -382,6 +364,22 @@ else
         echo
         grep -E "error:" "$BUILD_LOG" | sort -u | head -20 >&2 || true
         echo >&2
+        if grep -q "Unable to find a device matching the provided destination" "$BUILD_LOG"; then
+            die "xcodebuild cannot see $DEVICE_NAME" \
+"It was handed UDID $DEVICE_UDID, which xcodebuild did not recognise. The log
+lists what it can see — if only simulators appear, the phone is visible to
+devicectl but not to xcodebuild.
+
+Usually one of:
+  - the phone locked or was unplugged during the build
+  - Xcode is still copying developer symbols to it (open Xcode → Window →
+    Devices and Simulators and wait for it to finish)
+  - Developer Mode is off: Settings → Privacy & Security → Developer Mode,
+    then reboot
+
+Full log: $BUILD_LOG"
+        fi
+
         if grep -qE "requires a (development team|provisioning profile)|No profiles for|Signing for" "$BUILD_LOG"; then
             die "the build failed on code signing" \
 "Open the project once and pick your team:

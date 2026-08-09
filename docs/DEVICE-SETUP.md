@@ -150,6 +150,19 @@ Stale build products. The script keeps DerivedData in its own directory, so:
 ./scripts/install-device.sh --clean
 ```
 
+### "Unable to find a device matching the provided destination specifier"
+
+Followed by a long list of **simulators** and no phone. The phone is visible to
+`devicectl` but not to `xcodebuild`.
+
+Usually the phone locked or was unplugged mid-build, or Xcode is still copying
+developer symbols to it — open **Xcode → Window → Devices and Simulators** and
+wait for it to finish, then re-run.
+
+(Before v0.7.0 this was a bug in the script: it passed `devicectl`'s CoreDevice
+UUID to `xcodebuild`, which needs the hardware UDID. If you see it on an older
+checkout, update.)
+
 ### The phone does not appear at all
 
 ```sh

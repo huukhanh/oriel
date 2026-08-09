@@ -40,6 +40,16 @@ jobs:
       - run: pnpm test
         working-directory: web
 
+  # The device-parsing logic. No Mac and no phone needed, so it belongs in the
+  # fast job: devicectl reports a CoreDevice UUID *and* a hardware UDID, and
+  # handing xcodebuild the wrong one fails in a way that looks like the phone
+  # is invisible (issue #45).
+  device-parsing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/lib/test-parse-devices.sh
+
   # The injection engine in a real browser engine. Playwright's WebKit is the
   # WPE/GTK port — same JavaScriptCore and WebCore as WKWebView on iOS. It says
   # nothing about content worlds or media, but it settles injection timing, CSP
