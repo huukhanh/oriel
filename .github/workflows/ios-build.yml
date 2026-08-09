@@ -167,7 +167,13 @@ jobs:
           LIST_STATUS=$?
           set -e
           echo "--- --list output (exit $LIST_STATUS) ---"; cat out.txt
-          [ "$LIST_STATUS" = 0 ] || fail "--list exited $LIST_STATUS"
+          if [ "$LIST_STATUS" != 0 ]; then
+            echo "--- bash version ---"; bash --version | head -1; command -v bash
+            echo "--- full trace ---"
+            set +e; bash -x ./scripts/install-device.sh --list > trace.txt 2>&1; set -e
+            cat trace.txt
+            fail "--list exited $LIST_STATUS"
+          fi
           grep -qi "no paired devices\|UDID\|devicectl could not" out.txt \
             || fail "--list printed nothing useful"
 
