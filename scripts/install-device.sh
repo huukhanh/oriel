@@ -110,7 +110,14 @@ full Xcode:
 "Run: sudo xcode-select -s /Applications/Xcode.app" ;;
 esac
 
-XCODE_VERSION="$(xcodebuild -version 2>/dev/null | head -1 | awk '{print $2}')"
+# Captured whole, then read — not piped through `head`.
+#
+# `xcodebuild -version | head -1` dies with 134 under `set -o pipefail`: head
+# closes the pipe after one line, xcodebuild takes SIGPIPE, and pipefail
+# propagates the signal status. macOS ships bash 3.2 where this bites hardest,
+# and it aborts the script before it can print anything at all.
+XCODE_VERSION_RAW="$(xcodebuild -version 2>/dev/null || true)"
+XCODE_VERSION="$(printf '%s\n' "$XCODE_VERSION_RAW" | awk 'NR==1 {print $2}')"
 XCODE_MAJOR="${XCODE_VERSION%%.*}"
 if [ -z "$XCODE_MAJOR" ] || [ "$XCODE_MAJOR" -lt "$MIN_XCODE_MAJOR" ] 2>/dev/null; then
     die "Xcode ${XCODE_VERSION:-unknown} is too old" \
@@ -129,7 +136,8 @@ DEPLOYMENT_TARGET="$(
     grep -A2 'deploymentTarget:' "$REPO_ROOT/App/project.yml" 2>/dev/null \
         | grep 'iOS:' | tr -d ' "' | cut -d: -f2 || true
 )"
-SDK_VERSION="$(xcodebuild -showsdks 2>/dev/null | awk '/iphoneos/ {v=$NF} END {sub(/^iphoneos/,"",v); print v}' || true)"
+SDK_RAW="$(xcodebuild -showsdks 2>/dev/null || true)"
+SDK_VERSION="$(printf '%s\n' "$SDK_RAW" | awk '/iphoneos/ {v=$NF} END {sub(/^iphoneos/,"",v); print v}')"
 if [ -n "$DEPLOYMENT_TARGET" ] && [ -n "$SDK_VERSION" ]; then
     if [ "${SDK_VERSION%%.*}" -lt "${DEPLOYMENT_TARGET%%.*}" ] 2>/dev/null; then
         die "your iOS SDK ($SDK_VERSION) is older than this app's deployment target ($DEPLOYMENT_TARGET)" \
@@ -319,8 +327,10 @@ if [ "$FROM_IPA" = 1 ]; then
     APP="$WORK/payload/Payload/Oriel.app"
     [ -d "$APP" ] || die "the .ipa did not contain Payload/Oriel.app"
 
-    IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null \
-        | grep -E "Apple Development|iPhone Developer" | head -1 | sed -E 's/.*"(.*)"/\1/')" || true
+    IDENTITIES_RAW="$(security find-identity -v -p codesigning 2>/dev/null || true)"
+    IDENTITY="$(printf '%s\n' "$IDENTITIES_RAW" \
+        | awk '/Apple Development|iPhone Developer/ {print; exit}' \
+        | sed -E 's/.*"(.*)"/\1/')"
     [ -n "$IDENTITY" ] || die "no iOS development identity in your keychain" \
 "A phone will not run an unsigned app.
 
@@ -330,7 +340,8 @@ identity and the provisioning profile for you:
 
 See docs/DEVICE-SETUP.md § Signing."
 
-    PROFILE="$(ls -t ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)" || true
+    PROFILES_RAW="$(ls -t ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null || true)"
+    PROFILE="$(printf '%s\n' "$PROFILES_RAW" | awk 'NR==1 {print}')"
     [ -n "$PROFILE" ] || die "no provisioning profile on this Mac" \
 "Signing needs one that names this device, and only Xcode can create it.
 Build from source instead:
@@ -383,7 +394,8 @@ and re-run. See docs/DEVICE-SETUP.md § Signing."
         die "the build failed" "Full log: $BUILD_LOG"
     fi
 
-    APP="$(find "$DERIVED/Build/Products/$CONFIGURATION-iphoneos" -maxdepth 1 -name '*.app' | head -1)"
+    APPS_RAW="$(find "$DERIVED/Build/Products/$CONFIGURATION-iphoneos" -maxdepth 1 -name '*.app' 2>/dev/null || true)"
+    APP="$(printf '%s\n' "$APPS_RAW" | awk 'NR==1 {print}')"
     [ -n "$APP" ] || die "the build succeeded but produced no .app" "Log: $BUILD_LOG"
 fi
 

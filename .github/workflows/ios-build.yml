@@ -167,13 +167,15 @@ jobs:
           LIST_STATUS=$?
           set -e
           echo "--- --list output (exit $LIST_STATUS) ---"; cat out.txt
-          if [ "$LIST_STATUS" != 0 ]; then
-            echo "--- bash version ---"; bash --version | head -1; command -v bash
-            echo "--- full trace ---"
-            set +e; bash -x ./scripts/install-device.sh --list > trace.txt 2>&1; set -e
-            cat trace.txt
-            fail "--list exited $LIST_STATUS"
-          fi
+          [ "$LIST_STATUS" = 0 ] || fail "--list exited $LIST_STATUS"
+
+          # macOS ships bash 3.2, and the scripts must work there — that is
+          # what people actually have. A `cmd | head -1` under `set -o
+          # pipefail` aborts with 134 when head closes the pipe first, which is
+          # how this was found.
+          for s in scripts/*.sh; do
+            bash --posix -n "$s" 2>/dev/null || bash -n "$s" || fail "$s is not valid shell"
+          done
           grep -qi "no paired devices\|UDID\|devicectl could not" out.txt \
             || fail "--list printed nothing useful"
 
