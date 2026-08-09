@@ -157,10 +157,30 @@ mkdir -p "$WORK"
 step "Looking for devices"
 DEVICES_JSON="$WORK/devices.json"
 DEVICECTL_ERR="$WORK/devicectl.err"
+rm -f "$DEVICES_JSON"
+
+# Run it in a subshell with a time limit. devicectl does not merely fail on a
+# machine without CoreDevice set up — it can abort (SIGABRT) or hang, and
+# neither should take this script down or leave someone staring at a stopped
+# terminal.
 set +e
-xcrun devicectl list devices --json-output "$DEVICES_JSON" >/dev/null 2>"$DEVICECTL_ERR"
+(
+    trap 'exit 70' ABRT SEGV
+    xcrun devicectl list devices --json-output "$DEVICES_JSON"
+) >/dev/null 2>"$DEVICECTL_ERR" &
+DEVICECTL_PID=$!
+( sleep 30; kill -TERM "$DEVICECTL_PID" 2>/dev/null ) >/dev/null 2>&1 &
+WATCHDOG_PID=$!
+wait "$DEVICECTL_PID"
 DEVICECTL_STATUS=$?
+kill "$WATCHDOG_PID" 2>/dev/null
+wait "$WATCHDOG_PID" 2>/dev/null
 set -e
+
+# A crash that still wrote usable JSON is good enough to read.
+if [ "$DEVICECTL_STATUS" != 0 ] && [ -s "$DEVICES_JSON" ]; then
+    DEVICECTL_STATUS=0
+fi
 
 if [ "$DEVICECTL_STATUS" != 0 ]; then
     # `--list` is informational and the first thing the guide tells people to

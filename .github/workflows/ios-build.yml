@@ -162,12 +162,12 @@ jobs:
 
           # --list must succeed even with nothing paired. It is the first thing
           # the guide tells people to run, so it cannot be an error path.
-          # -x on failure: guessing at which preflight step exited is exactly
-          # the kind of thing this script exists to stop people doing.
-          ./scripts/install-device.sh --list > out.txt 2>&1 || {
-            echo "--- trace ---"; bash -x ./scripts/install-device.sh --list 2>&1 | tail -25
-            fail "--list exited non-zero"
-          }
+          set +e
+          ./scripts/install-device.sh --list > out.txt 2>&1
+          LIST_STATUS=$?
+          set -e
+          echo "--- --list output (exit $LIST_STATUS) ---"; cat out.txt
+          [ "$LIST_STATUS" = 0 ] || fail "--list exited $LIST_STATUS"
           grep -qi "no paired devices\|UDID\|devicectl could not" out.txt \
             || fail "--list printed nothing useful"
 
