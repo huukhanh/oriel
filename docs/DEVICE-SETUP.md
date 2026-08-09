@@ -77,37 +77,36 @@ Wi-Fi installs are slower and drop out more; cable is worth it while iterating.
 
 ## 4. Signing
 
-**You should not have to do anything here.** The script finds your team from
-the keychain, passes it to `xcodebuild`, and remembers it in a gitignored
-`.oriel-local` so it is looked up once.
+**All you need is an Apple ID signed in to Xcode.**
 
-All you need is an Apple ID in Xcode:
+**Xcode → Settings… → Accounts → + → Apple ID**, sign in. A free one is enough;
+nothing has to be bought or registered.
 
-1. **Xcode → Settings → Accounts → +** → Apple ID, sign in
-2. Select the account → **Manage Certificates → + → Apple Development**
+That is genuinely it. The script reads the team from Xcode's accounts, passes it
+to `xcodebuild`, and remembers it in a gitignored `.oriel-local`.
 
-A free Apple ID is enough.
-
-If detection ever picks the wrong team — several accounts on one Mac — name it:
+If you have several accounts and it picks the wrong one:
 
 ```sh
 ./scripts/install-device.sh --team ABCDE12345
 ```
 
-The Team ID is in **Xcode → Settings → Accounts**, next to the team name.
+It prints the teams Xcode knows about when the one it has does not match.
+
+> **A certificate in your keychain is not an account.** You can have an
+> *Apple Development* certificate and still get
+> `No Account for Team "..."` — that means the certificate exists but no Apple
+> ID owning it is signed in. Adding the account fixes it; creating another
+> certificate does not.
 
 > **Setting the Team in Xcode's Signing & Capabilities editor does not stick,
 > and cannot.** The script runs `xcodegen generate` before every build, which
-> rewrites `Oriel.xcodeproj` from `App/project.yml` and discards anything set
-> in the editor. That is why the team is passed on the command line instead.
->
-> Earlier versions of this guide and of the script's own error message told you
-> to set it in the editor. That advice was a loop with no exit — fixed in
-> v0.8.0.
+> rewrites `Oriel.xcodeproj` from `App/project.yml` and discards editor
+> settings. That is why the team is passed on the command line.
 
 **Bundle id collisions.** The default is `com.oriel.browser`. If it is already
-registered to someone else, signing fails even with a correct team. Change
-`PRODUCT_BUNDLE_IDENTIFIER` in `App/project.yml` to something personal —
+registered to someone else, signing fails even with a correct team and account.
+Change `PRODUCT_BUNDLE_IDENTIFIER` in `App/project.yml` to something personal —
 `com.yourname.oriel` — and re-run.
 
 ## 5. Trust the certificate on the phone
@@ -134,6 +133,14 @@ Developer Mode is off, or on but not rebooted. Section 2.
 ### "Unable to install — device is locked"
 
 Unlock the phone and re-run. Installs cannot start against a locked device.
+
+### "No Account for Team ..."
+
+The team exists as a certificate in your keychain, but no Apple ID owning it is
+signed in to Xcode. **Xcode → Settings… → Accounts → + → Apple ID.**
+
+Creating another certificate will not help — it is the *account* that is
+missing. The script now catches this before building and says so.
 
 ### "No profiles for 'com.oriel.browser' were found"
 

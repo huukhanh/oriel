@@ -50,6 +50,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: ./scripts/lib/test-parse-devices.sh
       - run: ./scripts/lib/test-parse-team.sh
+      - run: ./scripts/lib/test-parse-xcode-teams.sh
 
   # The injection engine in a real browser engine. Playwright's WebKit is the
   # WPE/GTK port — same JavaScriptCore and WebCore as WKWebView on iOS. It says

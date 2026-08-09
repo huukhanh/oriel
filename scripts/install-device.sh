@@ -348,47 +348,91 @@ else
     # ── build from source ────────────────────────────────────────────────────
     # Signing team.
     #
-    # It cannot live in the Xcode project: the next line regenerates that
+    # It cannot live in the Xcode project: the next step regenerates that
     # project from App/project.yml, which wipes anything set in the Signing &
-    # Capabilities editor. Telling people to set it there — as this script used
-    # to — sends them round a loop that cannot terminate. So it is detected
-    # here and passed to xcodebuild on the command line.
+    # Capabilities editor. So it is resolved here and passed on the command
+    # line.
+    #
+    # Source order matters. Xcode signs with an *account*, and a codesigning
+    # certificate in the keychain does not imply one — a leftover cert produced
+    # `No Account for Team "..."` in #49. So Xcode's own account list wins, and
+    # the keychain is only consulted when Xcode has never written preferences.
     if [ -z "$TEAM_ID" ] && [ -f "$REPO_ROOT/.oriel-local" ]; then
         # shellcheck disable=SC1091
         . "$REPO_ROOT/.oriel-local"
         TEAM_ID="${ORIEL_TEAM_ID:-}"
     fi
 
-    if [ -z "$TEAM_ID" ]; then
-        IDENTITIES_RAW="$(security find-identity -v -p codesigning 2>/dev/null || true)"
-        TEAM_ID="$(printf '%s\n' "$IDENTITIES_RAW" \
+    XCODE_PREFS="$HOME/Library/Preferences/com.apple.dt.Xcode.plist"
+    XCODE_TEAMS=""
+    if [ -f "$XCODE_PREFS" ]; then
+        XCODE_TEAMS="$(plutil -convert json -o - "$XCODE_PREFS" 2>/dev/null \
+            | python3 "$REPO_ROOT/scripts/lib/parse-xcode-teams.py" 2>/dev/null || true)"
+    fi
+
+    if [ -z "$TEAM_ID" ] && [ -n "$XCODE_TEAMS" ]; then
+        IFS=$'\t' read -r TEAM_ID TEAM_ACCOUNT TEAM_NAME \
+            <<< "$(printf '%s\n' "$XCODE_TEAMS" | sed -n 1p)"
+        note "team: $TEAM_ID  ($TEAM_NAME, $TEAM_ACCOUNT)"
+    fi
+
+    # No account in Xcode at all. Stop here rather than spending a build to be
+    # told the same thing less clearly.
+    if [ -z "$TEAM_ID" ] && [ -z "$XCODE_TEAMS" ]; then
+        KEYCHAIN_TEAM="$(security find-identity -v -p codesigning 2>/dev/null \
             | python3 "$REPO_ROOT/scripts/lib/parse-team.py" 2>/dev/null || true)"
+
+        if [ -n "$KEYCHAIN_TEAM" ]; then
+            die "there is a signing certificate for team $KEYCHAIN_TEAM, but Xcode has no account for it" \
+"A certificate in your keychain is not enough. Xcode signs with an *account*,
+and there is no Apple ID signed in — so the build would fail with
+\"No Account for Team $KEYCHAIN_TEAM\".
+
+  Xcode → Settings… → Accounts → + → Apple ID, and sign in
+
+A free Apple ID is enough. If the certificate belongs to an Apple ID you can
+still sign in with, use that one; otherwise any Apple ID will do and Xcode will
+create a fresh personal team.
+
+Then run this again — nothing else needs changing."
+        fi
+
+        die "no signing account in Xcode" \
+"Building for a device needs an Apple ID signed in to Xcode.
+
+  1. Xcode → Settings… → Accounts → + → Apple ID, and sign in
+  2. Run this again
+
+A free Apple ID is enough. Nothing needs to be bought or registered."
     fi
 
-    if [ -z "$TEAM_ID" ]; then
-        die "no signing team found" \
-"Xcode needs an Apple ID before it can sign anything for a device.
+    # A remembered or explicitly-passed team that Xcode has no account for is
+    # the #49 failure exactly. Catch it here, where the message can be useful.
+    if [ -n "$XCODE_TEAMS" ] && ! printf '%s\n' "$XCODE_TEAMS" | cut -f1 | grep -qx "$TEAM_ID"; then
+        AVAILABLE="$(printf '%s\n' "$XCODE_TEAMS" \
+            | awk -F'\t' '{printf "    %s  (%s, %s)\n", $1, $3, $2}')"
+        die "Xcode has no account for team $TEAM_ID" \
+"xcodebuild would fail with \"No Account for Team $TEAM_ID\".
 
-  1. Xcode → Settings → Accounts → + → Apple ID, and sign in
-  2. Select the account → Manage Certificates → + → Apple Development
-  3. Run this again
+Teams Xcode does have accounts for:
+$AVAILABLE
 
-A free Apple ID is enough.
+Use one of those:
+    ./scripts/install-device.sh --team <ID>
 
-Already have one? Pass the Team ID directly:
-    ./scripts/install-device.sh --team ABCDE12345
+If $TEAM_ID is the one you want, sign in to the Apple ID that owns it:
+    Xcode → Settings… → Accounts
 
-It is in Xcode → Settings → Accounts, next to your team name."
+A stale team can also be remembered from a previous run — remove
+.oriel-local to forget it."
     fi
 
-    # Remembered locally so it is asked for once. Not in App/project.yml,
-    # which is tracked — a Team ID is account-specific and does not belong in
+    # Remembered locally so it is asked for once. Not in App/project.yml, which
+    # is tracked — a Team ID is account-specific and does not belong in
     # everyone's checkout.
-    if [ ! -f "$REPO_ROOT/.oriel-local" ] || ! grep -q "$TEAM_ID" "$REPO_ROOT/.oriel-local" 2>/dev/null; then
+    if ! grep -qx "ORIEL_TEAM_ID=$TEAM_ID" "$REPO_ROOT/.oriel-local" 2>/dev/null; then
         printf 'ORIEL_TEAM_ID=%s\n' "$TEAM_ID" > "$REPO_ROOT/.oriel-local"
         note "remembered team $TEAM_ID in .oriel-local (gitignored)"
-    else
-        note "team: $TEAM_ID"
     fi
 
     step "Generating the Xcode project"
@@ -434,9 +478,21 @@ Usually one of:
 Full log: $BUILD_LOG"
         fi
 
+        if grep -q "No Account for Team" "$BUILD_LOG"; then
+            die "Xcode has no account for team $TEAM_ID" \
+"Sign in to the Apple ID that owns it:
+    Xcode → Settings… → Accounts → + → Apple ID
+
+Or pick a team Xcode does have an account for:
+    ./scripts/install-device.sh --team <ID>
+
+If .oriel-local is remembering a stale team, delete it."
+        fi
+
         if grep -qE "requires a (development team|provisioning profile)|No profiles for|Signing for" "$BUILD_LOG"; then
             die "the build failed on code signing" \
-"Team $TEAM_ID was passed to xcodebuild, so this is not a missing team.
+"Team $TEAM_ID was passed to xcodebuild and Xcode has an account for it, so
+this is neither a missing team nor a missing account.
 
 Most likely the bundle id is already registered to someone else. Change
 PRODUCT_BUNDLE_IDENTIFIER in App/project.yml to something personal —
