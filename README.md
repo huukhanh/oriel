@@ -25,6 +25,16 @@ scripts that the settings toggles enable.
 Full steps, including what to do when something fails:
 **[TESTING.md](TESTING.md)**.
 
+**Building it yourself on a Mac?** One command:
+
+```sh
+brew install xcodegen && ./scripts/install-device.sh
+```
+
+Setup that a script cannot do — Developer Mode, pairing, signing, trusting the
+certificate — plus the errors you will actually hit:
+**[docs/DEVICE-SETUP.md](docs/DEVICE-SETUP.md)**.
+
 > The build is unsigned on purpose — you sign it with your own Apple ID, so no
 > Apple certificates live in this repo. With a free Apple ID the signature
 > lasts 7 days before it needs re-signing.
