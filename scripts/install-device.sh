@@ -5,6 +5,7 @@
 #   ./scripts/install-device.sh                 build, install, launch
 #   ./scripts/install-device.sh --list          show paired devices and exit
 #   ./scripts/install-device.sh --device UDID   target a specific device
+#   ./scripts/install-device.sh --team ABCDE12345   signing team (usually auto)
 #   ./scripts/install-device.sh --logs          stream the app's log after launch
 #   ./scripts/install-device.sh --release       Release configuration
 #   ./scripts/install-device.sh --ipa           install the latest release .ipa instead
@@ -28,6 +29,7 @@ MIN_XCODE_MAJOR=15
 SCHEME="Oriel"
 CONFIGURATION="Debug"
 DEVICE_ARG="${ORIEL_DEVICE:-}"
+TEAM_ID="${ORIEL_TEAM_ID:-}"
 DO_CLEAN=0
 DO_LAUNCH=1
 DO_LOGS=0
@@ -66,6 +68,11 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --help|-h) usage ;;
         --list|-l) LIST_ONLY=1 ;;
+        --team)
+            [ $# -ge 2 ] || die "--team needs a 10-character Team ID" \
+"Find it in Xcode → Settings → Accounts → your Apple ID, or leave it out and
+this will detect it from your keychain."
+            TEAM_ID="$2"; shift ;;
         --device|-d)
             [ $# -ge 2 ] || die "--device needs a UDID or a device name" \
                 "Run with --list to see what is paired."
@@ -339,6 +346,51 @@ Build from source instead:
     codesign --verify --deep --strict "$APP" || die "the signature did not verify"
 else
     # ── build from source ────────────────────────────────────────────────────
+    # Signing team.
+    #
+    # It cannot live in the Xcode project: the next line regenerates that
+    # project from App/project.yml, which wipes anything set in the Signing &
+    # Capabilities editor. Telling people to set it there — as this script used
+    # to — sends them round a loop that cannot terminate. So it is detected
+    # here and passed to xcodebuild on the command line.
+    if [ -z "$TEAM_ID" ] && [ -f "$REPO_ROOT/.oriel-local" ]; then
+        # shellcheck disable=SC1091
+        . "$REPO_ROOT/.oriel-local"
+        TEAM_ID="${ORIEL_TEAM_ID:-}"
+    fi
+
+    if [ -z "$TEAM_ID" ]; then
+        IDENTITIES_RAW="$(security find-identity -v -p codesigning 2>/dev/null || true)"
+        TEAM_ID="$(printf '%s\n' "$IDENTITIES_RAW" \
+            | python3 "$REPO_ROOT/scripts/lib/parse-team.py" 2>/dev/null || true)"
+    fi
+
+    if [ -z "$TEAM_ID" ]; then
+        die "no signing team found" \
+"Xcode needs an Apple ID before it can sign anything for a device.
+
+  1. Xcode → Settings → Accounts → + → Apple ID, and sign in
+  2. Select the account → Manage Certificates → + → Apple Development
+  3. Run this again
+
+A free Apple ID is enough.
+
+Already have one? Pass the Team ID directly:
+    ./scripts/install-device.sh --team ABCDE12345
+
+It is in Xcode → Settings → Accounts, next to your team name."
+    fi
+
+    # Remembered locally so it is asked for once. Not in App/project.yml,
+    # which is tracked — a Team ID is account-specific and does not belong in
+    # everyone's checkout.
+    if [ ! -f "$REPO_ROOT/.oriel-local" ] || ! grep -q "$TEAM_ID" "$REPO_ROOT/.oriel-local" 2>/dev/null; then
+        printf 'ORIEL_TEAM_ID=%s\n' "$TEAM_ID" > "$REPO_ROOT/.oriel-local"
+        note "remembered team $TEAM_ID in .oriel-local (gitignored)"
+    else
+        note "team: $TEAM_ID"
+    fi
+
     step "Generating the Xcode project"
     ( cd "$REPO_ROOT/App" && xcodegen generate >/dev/null ) \
         || die "xcodegen failed" "Check App/project.yml."
@@ -356,6 +408,8 @@ else
         -destination "id=$DEVICE_UDID" \
         -derivedDataPath "$DERIVED" \
         -allowProvisioningUpdates \
+        DEVELOPMENT_TEAM="$TEAM_ID" \
+        CODE_SIGN_STYLE=Automatic \
         build > "$BUILD_LOG" 2>&1
     BUILD_STATUS=$?
     set -e
@@ -382,12 +436,19 @@ Full log: $BUILD_LOG"
 
         if grep -qE "requires a (development team|provisioning profile)|No profiles for|Signing for" "$BUILD_LOG"; then
             die "the build failed on code signing" \
-"Open the project once and pick your team:
-    open App/Oriel.xcodeproj
-  → target Oriel → Signing & Capabilities → Team
+"Team $TEAM_ID was passed to xcodebuild, so this is not a missing team.
 
-If the bundle id is taken, change PRODUCT_BUNDLE_IDENTIFIER in App/project.yml
-and re-run. See docs/DEVICE-SETUP.md § Signing."
+Most likely the bundle id is already registered to someone else. Change
+PRODUCT_BUNDLE_IDENTIFIER in App/project.yml to something personal —
+com.yourname.oriel — and run this again.
+
+Free Apple IDs are also capped at 10 App IDs per 7 days; if you have been
+creating them, that cap is worth checking.
+
+Setting the team in Xcode's editor will NOT help: this script regenerates the
+project on every run, which wipes it. Use --team instead.
+
+Full log: $BUILD_LOG"
         fi
         die "the build failed" "Full log: $BUILD_LOG"
     fi
