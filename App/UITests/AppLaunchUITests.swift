@@ -27,6 +27,27 @@ final class AppLaunchUITests: XCTestCase {
         app.launch()
     }
 
+    /// Find an element, scrolling if it is below the fold.
+    ///
+    /// The runner picks whatever iPhone the image has — currently an SE, the
+    /// smallest — and SwiftUI's `Form` is lazy, so a row further down the
+    /// settings screen is not merely off-screen but *not built*. Reordering the
+    /// UI to keep tests happy is the tail wagging the dog; scrolling is what a
+    /// person does.
+    @discardableResult
+    private func scrollTo(_ element: XCUIElement, swipes: Int = 6) -> Bool {
+        if element.waitForExistence(timeout: 3) {
+            return true
+        }
+        for _ in 0..<swipes {
+            app.swipeUp()
+            if element.exists {
+                return true
+            }
+        }
+        return element.exists
+    }
+
     /// The one that matters most. An app that traps during `AppModel.init` —
     /// a bad store path, a missing bundle resource — fails here and nowhere
     /// else in this project.
@@ -54,7 +75,7 @@ final class AppLaunchUITests: XCTestCase {
         app.buttons["toolbar.settings"].tap()
 
         let toggle = app.switches["Show address bar (debug)"]
-        XCTAssertTrue(toggle.waitForExistence(timeout: 10), "the toggle is missing from Settings")
+        XCTAssertTrue(scrollTo(toggle), "the toggle is missing from Settings")
 
         let before = toggle.value as? String
         // Tap the right-hand side, where the switch actually is. A plain
@@ -138,7 +159,7 @@ final class AppLaunchUITests: XCTestCase {
         app.buttons["toolbar.settings"].tap()
 
         let row = app.buttons["settings.scripts"]
-        XCTAssertTrue(row.waitForExistence(timeout: 10), "Settings has no Scripts row")
+        XCTAssertTrue(scrollTo(row), "Settings has no Scripts row")
         row.tap()
 
         XCTAssertTrue(
@@ -159,14 +180,14 @@ final class AppLaunchUITests: XCTestCase {
             .matching(NSPredicate(format: "label CONTAINS[c] %@", "Reloads the page"))
             .firstMatch
         XCTAssertTrue(
-            reloadHeader.waitForExistence(timeout: 15),
+            scrollTo(reloadHeader),
             "the settings screen does not warn which toggles throw the page away"
         )
 
         // The toggles themselves matter more than the headers: one from each
         // group proves the split reached the screen.
-        XCTAssertTrue(app.switches["Inline playback"].exists, "config-group toggle missing")
-        XCTAssertTrue(app.switches["Desktop site"].exists, "live-group toggle missing")
+        XCTAssertTrue(scrollTo(app.switches["Inline playback"]), "config-group toggle missing")
+        XCTAssertTrue(scrollTo(app.switches["Desktop site"]), "live-group toggle missing")
     }
 
     /// The sleep timer is reachable and reflects its state — §3's media list.
@@ -175,7 +196,7 @@ final class AppLaunchUITests: XCTestCase {
         app.buttons["toolbar.settings"].tap()
 
         let preset = app.buttons["30 minutes"]
-        XCTAssertTrue(preset.waitForExistence(timeout: 10), "no sleep timer presets in Settings")
+        XCTAssertTrue(scrollTo(preset), "no sleep timer presets in Settings")
         preset.tap()
 
         XCTAssertTrue(
