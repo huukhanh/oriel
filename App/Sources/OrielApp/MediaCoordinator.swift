@@ -30,12 +30,79 @@ final class MediaCoordinator {
     /// being fatal.
     private(set) var lastError: String?
 
+    /// Tokens from `addTarget`. Kept because dropping them leaks the handler
+    /// for the lifetime of the process, and a second registration would then
+    /// mean the lock-screen button fires twice.
+    private var commandTokens: [Any] = []
+
+    /// Sends a command to the page. Set once the webview exists; the lock
+    /// screen has nothing to drive until then.
+    var perform: (@MainActor (MediaCommand) -> Void)?
+
     func apply(settings: Settings) {
         self.settings = settings
         if settings.enableBackgroundAudio {
             activateSession()
         }
         updateIdleTimer()
+        registerRemoteCommands()
+    }
+
+    /// Lock screen and Control Center.
+    ///
+    /// Registering these is what was missing in #37: metadata was published, so
+    /// the card appeared, but nothing was listening — the buttons moved and the
+    /// page carried on regardless. A control that looks live and does nothing is
+    /// worse than no control.
+    private func registerRemoteCommands() {
+        guard commandTokens.isEmpty else {
+            return
+        }
+        let center = MPRemoteCommandCenter.shared()
+
+        center.playCommand.isEnabled = true
+        commandTokens.append(
+            center.playCommand.addTarget { [weak self] _ in
+                self?.perform?(.play)
+                return .success
+            }
+        )
+
+        center.pauseCommand.isEnabled = true
+        commandTokens.append(
+            center.pauseCommand.addTarget { [weak self] _ in
+                self?.perform?(.pause)
+                return .success
+            }
+        )
+
+        // Headphone and steering-wheel controls send this rather than
+        // play/pause, so without it those do nothing at all.
+        center.togglePlayPauseCommand.isEnabled = true
+        commandTokens.append(
+            center.togglePlayPauseCommand.addTarget { [weak self] _ in
+                self?.perform?(.toggle)
+                return .success
+            }
+        )
+
+        center.skipForwardCommand.isEnabled = true
+        center.skipForwardCommand.preferredIntervals = [NSNumber(value: 15)]
+        commandTokens.append(
+            center.skipForwardCommand.addTarget { [weak self] _ in
+                self?.perform?(.skipForward(15))
+                return .success
+            }
+        )
+
+        center.skipBackwardCommand.isEnabled = true
+        center.skipBackwardCommand.preferredIntervals = [NSNumber(value: 15)]
+        commandTokens.append(
+            center.skipBackwardCommand.addTarget { [weak self] _ in
+                self?.perform?(.skipBackward(15))
+                return .success
+            }
+        )
     }
 
     /// Called from the page bridge when playback starts or stops.
@@ -102,5 +169,15 @@ final class MediaCoordinator {
         UIApplication.shared.isIdleTimerDisabled = false
         clearNowPlaying()
         deactivateSession()
+
+        let center = MPRemoteCommandCenter.shared()
+        for token in commandTokens {
+            center.playCommand.removeTarget(token)
+            center.pauseCommand.removeTarget(token)
+            center.togglePlayPauseCommand.removeTarget(token)
+            center.skipForwardCommand.removeTarget(token)
+            center.skipBackwardCommand.removeTarget(token)
+        }
+        commandTokens.removeAll()
     }
 }

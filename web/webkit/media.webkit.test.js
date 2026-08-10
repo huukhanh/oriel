@@ -148,3 +148,110 @@ describe("playback events", () => {
         await context.close();
     });
 });
+
+/**
+ * The entry points the lock screen and Control Center drive through
+ * MPRemoteCommandCenter (#37). The buttons are native; the thing they have to
+ * move is a media element inside the page, so the command comes back here.
+ */
+describe("remote commands", () => {
+    async function withVideo() {
+        const { context, page } = await pageWithPrelude(browser);
+        await page.goto(server.url("/"));
+        // jsdom-free: a real HTMLMediaElement in WebKit, with play() stubbed
+        // because a runner has no decodable media. What matters is that the
+        // right element is picked and the right method called on it.
+        await page.evaluate(() => {
+            const video = document.getElementById("main");
+            window.__calls = [];
+            video.play = function () {
+                window.__calls.push("play");
+                Object.defineProperty(video, "paused", { value: false, configurable: true });
+                return Promise.resolve();
+            };
+            video.pause = function () {
+                window.__calls.push("pause");
+                Object.defineProperty(video, "paused", { value: true, configurable: true });
+            };
+        });
+        return { context, page };
+    }
+
+    it("play() starts the picked element", async () => {
+        const { context, page } = await withVideo();
+        expect(await page.evaluate(() => window.__inj.media.play())).toBe("ok");
+        expect(await page.evaluate(() => window.__calls)).toEqual(["play"]);
+        await context.close();
+    });
+
+    it("pause() stops it", async () => {
+        const { context, page } = await withVideo();
+        await page.evaluate(() => window.__inj.media.play());
+        expect(await page.evaluate(() => window.__inj.media.pause())).toBe("ok");
+        expect(await page.evaluate(() => window.__calls)).toEqual(["play", "pause"]);
+        await context.close();
+    });
+
+    it("toggle() follows the element's actual state", async () => {
+        const { context, page } = await withVideo();
+        // Starts paused, so the first toggle plays.
+        await page.evaluate(() => window.__inj.media.toggle());
+        await page.evaluate(() => window.__inj.media.toggle());
+        expect(await page.evaluate(() => window.__calls)).toEqual(["play", "pause"]);
+        await context.close();
+    });
+
+    it("reports honestly when there is nothing to control", async () => {
+        const { context, page } = await pageWithPrelude(browser);
+        await page.goto(server.url("/empty"));
+        expect(await page.evaluate(() => window.__inj.media.play())).toBe("no-media");
+        expect(await page.evaluate(() => window.__inj.media.toggle())).toBe("no-media");
+        expect(await page.evaluate(() => window.__inj.media.seekBy(30))).toBe("no-media");
+        await context.close();
+    });
+
+    it("a rejected play() does not escape", async () => {
+        // The platform refuses playback without a user gesture. Letting that
+        // rejection surface would make the lock-screen button look broken in
+        // a different way than it is.
+        const { context, page } = await pageWithPrelude(browser);
+        await page.goto(server.url("/"));
+        const result = await page.evaluate(() => {
+            const video = document.getElementById("main");
+            video.play = () => Promise.reject(new Error("NotAllowedError"));
+            return window.__inj.media.play();
+        });
+        expect(result).toBe("ok");
+        await context.close();
+    });
+
+    it("seekBy moves currentTime and clamps at zero", async () => {
+        const { context, page } = await pageWithPrelude(browser);
+        await page.goto(server.url("/"));
+        const times = await page.evaluate(() => {
+            const video = document.getElementById("main");
+            Object.defineProperty(video, "currentTime", { value: 50, writable: true, configurable: true });
+            window.__inj.media.seekBy(15);
+            const forward = video.currentTime;
+            window.__inj.media.seekBy(-999);
+            return { forward, clamped: video.currentTime };
+        });
+        expect(times.forward).toBe(65);
+        expect(times.clamped, "seeking before the start stalls some players").toBe(0);
+        await context.close();
+    });
+
+    it("seekBy clamps at the duration", async () => {
+        const { context, page } = await pageWithPrelude(browser);
+        await page.goto(server.url("/"));
+        const time = await page.evaluate(() => {
+            const video = document.getElementById("main");
+            Object.defineProperty(video, "currentTime", { value: 10, writable: true, configurable: true });
+            Object.defineProperty(video, "duration", { value: 30, configurable: true });
+            window.__inj.media.seekBy(999);
+            return video.currentTime;
+        });
+        expect(time, "seeking past the end stalls some players").toBe(30);
+        await context.close();
+    });
+});

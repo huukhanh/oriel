@@ -96,6 +96,7 @@ final class AppLaunchUITests: XCTestCase {
         for identifier in [
             "toolbar.reload",
             "toolbar.pip",
+            "toolbar.airplay",
             "toolbar.scripts",
             "toolbar.log",
             "toolbar.home",
