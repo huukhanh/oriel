@@ -18,6 +18,9 @@ public struct AppState: Hashable, Sendable, Codable {
     public var scriptValues: [String: [String: String]]
     /// Recently visited pages, for the home screen.
     public var recents: RecentURLs
+    /// Stops playback at a wall-clock deadline. Persisted so it survives the
+    /// app being suspended, which is most of the time it is counting.
+    public var sleepTimer: SleepTimer
 
     public init(
         version: Int = AppState.currentVersion,
@@ -26,7 +29,8 @@ public struct AppState: Hashable, Sendable, Codable {
         settings: Settings = Settings(),
         builtinState: [String: BuiltinState] = [:],
         scriptValues: [String: [String: String]] = [:],
-        recents: RecentURLs = RecentURLs()
+        recents: RecentURLs = RecentURLs(),
+        sleepTimer: SleepTimer = SleepTimer()
     ) {
         self.version = version
         self.scripts = scripts
@@ -35,6 +39,7 @@ public struct AppState: Hashable, Sendable, Codable {
         self.builtinState = builtinState
         self.scriptValues = scriptValues
         self.recents = recents
+        self.sleepTimer = sleepTimer
     }
 
     /// A launcher with nothing in it looks broken on first run.
@@ -63,6 +68,8 @@ public struct AppState: Hashable, Sendable, Codable {
             try container.decodeIfPresent([String: [String: String]].self, forKey: .scriptValues)
             ?? [:]
         recents = try container.decodeIfPresent(RecentURLs.self, forKey: .recents) ?? RecentURLs()
+        sleepTimer =
+            try container.decodeIfPresent(SleepTimer.self, forKey: .sleepTimer) ?? SleepTimer()
     }
 }
 

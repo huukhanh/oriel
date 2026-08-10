@@ -34,8 +34,6 @@ public struct Settings: Hashable, Sendable, Codable {
     /// Keeps the screen awake while media plays.
     public var disableIdleTimerDuringPlayback: Bool
     public var enableBackgroundAudio: Bool
-    /// Minutes; 0 means off.
-    public var sleepTimerMinutes: Int
 
     public init(
         allowsInlineMediaPlayback: Bool = true,
@@ -46,8 +44,7 @@ public struct Settings: Hashable, Sendable, Codable {
         useDesktopUserAgent: Bool = false,
         showAddressBar: Bool = false,
         disableIdleTimerDuringPlayback: Bool = true,
-        enableBackgroundAudio: Bool = true,
-        sleepTimerMinutes: Int = 0
+        enableBackgroundAudio: Bool = true
     ) {
         self.allowsInlineMediaPlayback = allowsInlineMediaPlayback
         self.allowsPictureInPicture = allowsPictureInPicture
@@ -58,7 +55,6 @@ public struct Settings: Hashable, Sendable, Codable {
         self.showAddressBar = showAddressBar
         self.disableIdleTimerDuringPlayback = disableIdleTimerDuringPlayback
         self.enableBackgroundAudio = enableBackgroundAudio
-        self.sleepTimerMinutes = sleepTimerMinutes
     }
 
     /// Whether moving from `other` to `self` means the webview must be rebuilt.

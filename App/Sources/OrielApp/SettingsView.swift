@@ -50,6 +50,26 @@ struct SettingsView: View {
                     toggle("Background audio", \.enableBackgroundAudio)
                 }
 
+                Section("Sleep timer") {
+                    if model.state.sleepTimer.isActive {
+                        HStack {
+                            Text("Stops in")
+                            Spacer()
+                            Text(model.state.sleepTimer.label())
+                                .foregroundStyle(Color.secondary)
+                        }
+                        Button("Cancel timer", role: .destructive) {
+                            model.cancelSleepTimer()
+                        }
+                    } else {
+                        ForEach(SleepTimer.presets, id: \.self) { minutes in
+                            Button("\(minutes) minutes") {
+                                model.startSleepTimer(minutes: minutes)
+                            }
+                        }
+                    }
+                }
+
                 Section("About background audio") {
                     // Honest rather than encouraging. Decision 004: this has
                     // never been verified on hardware, and a toggle that

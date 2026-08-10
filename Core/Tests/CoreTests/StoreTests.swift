@@ -96,7 +96,6 @@ final class SettingsTests: XCTestCase {
             $0.disableIdleTimerDuringPlayback.toggle()
         },
         Mutation(name: "enableBackgroundAudio") { $0.enableBackgroundAudio.toggle() },
-        Mutation(name: "sleepTimerMinutes") { $0.sleepTimerMinutes = 30 },
     ]
 }
 

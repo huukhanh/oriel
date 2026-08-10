@@ -341,7 +341,35 @@ final class AppModel: ObservableObject {
         return (state.scriptValues[scriptID].map { Array($0.keys) } ?? []).sorted()
     }
 
-    func mediaStateChanged(_ state: MediaState) {
+    func startSleepTimer(minutes: Int) {
+        state.sleepTimer.start(minutes: minutes)
+        persist()
+    }
+
+    func cancelSleepTimer() {
+        state.sleepTimer.cancel()
+        persist()
+    }
+
+    func mediaStateChanged(_ mediaState: MediaState) {
+        let state = mediaState
+        // Checked on the media tick rather than by a Timer: a Timer does not
+        // fire while the app is suspended, which is most of when a sleep timer
+        // is counting. The deadline is absolute, so arriving late still works.
+        if self.state.sleepTimer.shouldStopPlayback() {
+            runMediaCommand(.pause)
+            persist()
+            record(
+                LogEntry(
+                    id: UUID(),
+                    at: Date(),
+                    scriptID: "media",
+                    level: "log",
+                    message: "sleep timer reached — playback paused"
+                )
+            )
+        }
+
         media.setPlaying(state.playing)
         if state.hasMedia, state.playing {
             media.nowPlaying(

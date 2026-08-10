@@ -162,6 +162,27 @@ final class AppLaunchUITests: XCTestCase {
         XCTAssertTrue(app.switches["Desktop site"].exists, "live-group toggle missing")
     }
 
+    /// The sleep timer is reachable and reflects its state — §3's media list.
+    func testSleepTimerIsInSettings() {
+        XCTAssertTrue(app.buttons["toolbar.home"].waitForExistence(timeout: 20))
+        app.buttons["toolbar.settings"].tap()
+
+        let preset = app.buttons["30 minutes"]
+        XCTAssertTrue(preset.waitForExistence(timeout: 10), "no sleep timer presets in Settings")
+        preset.tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Stops in"].waitForExistence(timeout: 10),
+            "starting the timer did not change the row"
+        )
+        XCTAssertTrue(
+            app.buttons["Cancel timer"].exists,
+            "an active timer must be cancellable, or it cannot be undone"
+        )
+        app.buttons["Cancel timer"].tap()
+        XCTAssertTrue(app.buttons["30 minutes"].waitForExistence(timeout: 10))
+    }
+
     func testLogOpensAndIsEmptyOnACleanLaunch() {
         XCTAssertTrue(app.buttons["toolbar.home"].waitForExistence(timeout: 20))
         app.buttons["toolbar.log"].tap()
