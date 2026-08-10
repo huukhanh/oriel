@@ -61,7 +61,39 @@ final class AppModel: ObservableObject {
         self.webView = webView
         self.injection = injection
         injection.rebuild(with: scripts)
+
+        // The lock screen has nothing to drive until a webview exists, which
+        // is why this is wired here rather than at init.
+        media.perform = { [weak self] command in
+            self?.runMediaCommand(command)
+        }
         media.apply(settings: state.settings)
+    }
+
+    /// Runs a lock-screen or Control Center command against the page.
+    private func runMediaCommand(_ command: MediaCommand) {
+        guard let webView else {
+            return
+        }
+        webView.evaluateJavaScript(command.javaScript, in: nil, in: .page) { [weak self] result in
+            guard case .success(let value) = result else {
+                return
+            }
+            // "no-media" means the card is showing for a page that no longer
+            // has anything to play. Silence would leave the user tapping a
+            // button that cannot work, with nowhere to look.
+            if String(describing: value) == "no-media" {
+                self?.record(
+                    LogEntry(
+                        id: UUID(),
+                        at: Date(),
+                        scriptID: "media",
+                        level: "warn",
+                        message: "remote command \(command) found no media on this page"
+                    )
+                )
+            }
+        }
     }
 
     func record(_ entry: LogEntry) {

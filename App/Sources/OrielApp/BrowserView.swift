@@ -101,6 +101,13 @@ struct BrowserView: View {
             }
             .accessibilityIdentifier("toolbar.pip")
 
+            // The system picker, not a custom control: only the system can
+            // move an in-flight media session to another device. §4.3 lists
+            // AirPlay in the toolbar.
+            AirPlayButton()
+                .frame(width: 34, height: 34)
+                .accessibilityIdentifier("toolbar.airplay")
+
             Button(action: { showingScripts = true }) {
                 // The count is the point: "3 scripts active here" is the fast
                 // path to switching one off when a site breaks.

@@ -473,6 +473,49 @@
         return "unsupported";
     }
 
+    // Driven by the lock screen and Control Center via MPRemoteCommandCenter.
+    // Those controls are native, but the thing they have to move is a media
+    // element inside the page, so the command has to come back through here.
+    function setPlaying(shouldPlay) {
+        var element = pickMedia();
+        if (!element) {
+            return "no-media";
+        }
+        try {
+            if (shouldPlay) {
+                var promise = element.play();
+                // play() rejects when the platform refuses — no user gesture,
+                // or a policy block. Swallowing it would make the lock-screen
+                // button look like it worked.
+                if (promise && typeof promise.catch === "function") {
+                    promise.catch(function () {});
+                }
+            } else {
+                element.pause();
+            }
+            return "ok";
+        } catch (error) {
+            return "failed:" + error;
+        }
+    }
+
+    function seekBy(seconds) {
+        var element = pickMedia();
+        if (!element || !isFinite(element.currentTime)) {
+            return "no-media";
+        }
+        var target = element.currentTime + seconds;
+        if (target < 0) {
+            target = 0;
+        }
+        // Seeking past the end makes some players stall rather than advance.
+        if (isFinite(element.duration) && element.duration > 0 && target > element.duration) {
+            target = element.duration;
+        }
+        element.currentTime = target;
+        return "ok";
+    }
+
     function postMediaState() {
         try {
             global.webkit.messageHandlers.mediaState.postMessage(mediaState());
@@ -499,7 +542,17 @@
         media: {
             enterPiP: enterPiP,
             state: mediaState,
-            pick: pickMedia
+            pick: pickMedia,
+            play: function () { return setPlaying(true); },
+            pause: function () { return setPlaying(false); },
+            toggle: function () {
+                var element = pickMedia();
+                if (!element) {
+                    return "no-media";
+                }
+                return setPlaying(element.paused || element.ended);
+            },
+            seekBy: seekBy
         },
         _entries: entries
     };

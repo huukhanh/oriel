@@ -23,12 +23,24 @@ public final class MPRemoteCommandCenter: @unchecked Sendable {
     public let playCommand = MPRemoteCommand()
     public let pauseCommand = MPRemoteCommand()
     public let togglePlayPauseCommand = MPRemoteCommand()
-    public let skipForwardCommand = MPRemoteCommand()
-    public let skipBackwardCommand = MPRemoteCommand()
+    public let skipForwardCommand = MPSkipIntervalCommand()
+    public let skipBackwardCommand = MPSkipIntervalCommand()
 }
 
 public final class MPRemoteCommand {
     public var isEnabled: Bool = false
+    /// Returns an opaque token that must be kept to deregister later. Dropping
+    /// it leaks the handler for the lifetime of the process.
+    @discardableResult
+    public func addTarget(
+        handler: @escaping (MPRemoteCommandEvent) -> MPRemoteCommandHandlerStatus
+    ) -> Any { self }
+    public func removeTarget(_ target: Any?) {}
+}
+
+public final class MPSkipIntervalCommand {
+    public var isEnabled: Bool = false
+    public var preferredIntervals: [NSNumber] = []
     @discardableResult
     public func addTarget(
         handler: @escaping (MPRemoteCommandEvent) -> MPRemoteCommandHandlerStatus
