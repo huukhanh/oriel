@@ -23,6 +23,7 @@ final class MediaCoordinator {
 
     private let session = AVAudioSession.sharedInstance()
     private var isSessionActive = false
+    private var interruptionObserver: (any NSObjectProtocol)?
     private var isPlaying = false
     private var settings = Settings()
 
@@ -46,6 +47,7 @@ final class MediaCoordinator {
         }
         updateIdleTimer()
         registerRemoteCommands()
+        observeInterruptions()
     }
 
     /// Lock screen and Control Center.
@@ -114,6 +116,47 @@ final class MediaCoordinator {
         updateIdleTimer()
     }
 
+    /// Interruptions: a call, an alarm, another app taking the session.
+    ///
+    /// Without this, the first interruption ends background playback until the
+    /// app is relaunched — the session is deactivated by the system and nothing
+    /// ever reactivates it. That is indistinguishable from "background audio
+    /// does not work", which is how it would be reported.
+    func observeInterruptions() {
+        guard interruptionObserver == nil else {
+            return
+        }
+        interruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] notification in
+            let raw = notification.userInfo?[AVAudioSession.interruptionTypeKey] as? UInt
+            Task { @MainActor in
+                guard let self else {
+                    return
+                }
+                if raw == AVAudioSession.InterruptionType.began.rawValue {
+                    // The system has already deactivated it; just record that.
+                    self.isSessionActive = false
+                } else {
+                    self.activateSession()
+                    self.resumeAfterInterruption?()
+                }
+            }
+        }
+    }
+
+    /// Called after an interruption ends, so the page can resume.
+    var resumeAfterInterruption: (@MainActor () -> Void)?
+
+    /// Activating once at launch is not enough.
+    ///
+    /// Another app taking the session deactivates ours, and an interruption —
+    /// a call, an alarm — does the same. If we only ever activate at startup,
+    /// the first phone call silently ends background playback for the rest of
+    /// the session. So this is called again whenever playback starts, and the
+    /// already-active guard makes that cheap.
     private func activateSession() {
         guard settings.enableBackgroundAudio, isSessionActive == false else {
             return
@@ -179,5 +222,10 @@ final class MediaCoordinator {
             center.skipBackwardCommand.removeTarget(token)
         }
         commandTokens.removeAll()
+
+        if let interruptionObserver {
+            NotificationCenter.default.removeObserver(interruptionObserver)
+            self.interruptionObserver = nil
+        }
     }
 }

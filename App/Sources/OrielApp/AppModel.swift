@@ -67,6 +67,12 @@ final class AppModel: ObservableObject {
         media.perform = { [weak self] command in
             self?.runMediaCommand(command)
         }
+        // A call or an alarm deactivates the session. Resuming is the
+        // difference between "playback paused for a phone call" and "background
+        // audio stopped working", which look identical from the outside.
+        media.resumeAfterInterruption = { [weak self] in
+            self?.runMediaCommand(.play)
+        }
         media.apply(settings: state.settings)
     }
 

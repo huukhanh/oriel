@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name        Force inline playback
-// @description Marks every video playsinline, so it plays in the page instead of taking over the screen.
+// @description Marks every video playsinline and AirPlay-able, so it plays in the page and can be sent to a TV.
 // @version     1.0.0
 // @match       <all_urls>
 // @run-at      document-start
@@ -27,6 +27,21 @@
         }
         if (!element.hasAttribute("webkit-playsinline")) {
             element.setAttribute("webkit-playsinline", "");
+        }
+        // Sites opt out of AirPlay by setting this to "deny", which greys out
+        // the route picker for their video specifically. Overriding it is the
+        // difference between the AirPlay button working and looking broken.
+        if (element.getAttribute("x-webkit-airplay") !== "allow") {
+            element.setAttribute("x-webkit-airplay", "allow");
+        }
+        // Same for the standard opt-out: `disableRemotePlayback` hides the
+        // video from the Remote Playback API entirely.
+        if (element.disableRemotePlayback) {
+            try {
+                element.disableRemotePlayback = false;
+            } catch (e) {
+                /* read-only on some players */
+            }
         }
     }
 

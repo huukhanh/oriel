@@ -73,4 +73,12 @@ public final class AVAudioSession: @unchecked Sendable {
         case began = 1
         case ended = 0
     }
+
+    public static let interruptionOptionKey = "AVAudioSessionInterruptionOptionKey"
+
+    public struct InterruptionOptions: OptionSet, Sendable {
+        public let rawValue: UInt
+        public init(rawValue: UInt) { self.rawValue = rawValue }
+        public static let shouldResume = InterruptionOptions(rawValue: 1)
+    }
 }

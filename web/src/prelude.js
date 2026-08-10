@@ -516,7 +516,74 @@
         return "ok";
     }
 
+    // navigator.mediaSession.
+    //
+    // This is how a page tells the OS "I am a real playback session" rather
+    // than "I am a tab that happens to make noise". Without it, WebKit is far
+    // more willing to suspend the media process when the app is backgrounded,
+    // and the lock screen has nothing of its own to show.
+    //
+    // The app also publishes Now Playing from Swift via MPNowPlayingInfoCenter.
+    // These are not redundant: the Swift side drives the iOS lock screen, and
+    // this side is what makes WebKit treat the playback as a session worth
+    // keeping alive in the first place.
+    function updateMediaSession() {
+        var session = global.navigator && global.navigator.mediaSession;
+        if (!session) {
+            return;
+        }
+
+        var element = pickMedia();
+        if (!element) {
+            try {
+                session.playbackState = "none";
+            } catch (e) {
+                /* older WebKit */
+            }
+            return;
+        }
+
+        try {
+            session.playbackState = element.paused ? "paused" : "playing";
+        } catch (e) {
+            /* older WebKit */
+        }
+
+        try {
+            if (global.MediaMetadata) {
+                session.metadata = new global.MediaMetadata({
+                    title: global.document.title || location.hostname,
+                    artist: location.hostname
+                });
+            }
+        } catch (e) {
+            /* metadata is a nicety; the handlers below are the point */
+        }
+
+        // Registering handlers is what actually matters. A session with no
+        // action handlers is one iOS can suspend freely, because nothing has
+        // claimed it can respond.
+        var handlers = {
+            play: function () { setPlaying(true); },
+            pause: function () { setPlaying(false); },
+            seekforward: function () { seekBy(15); },
+            seekbackward: function () { seekBy(-15); }
+        };
+        for (var action in handlers) {
+            if (!Object.prototype.hasOwnProperty.call(handlers, action)) {
+                continue;
+            }
+            try {
+                session.setActionHandler(action, handlers[action]);
+            } catch (e) {
+                // Not every action is supported everywhere, and an unsupported
+                // one throws rather than being ignored.
+            }
+        }
+    }
+
     function postMediaState() {
+        updateMediaSession();
         try {
             global.webkit.messageHandlers.mediaState.postMessage(mediaState());
         } catch (e) {
@@ -552,7 +619,8 @@
                 }
                 return setPlaying(element.paused || element.ended);
             },
-            seekBy: seekBy
+            seekBy: seekBy,
+            updateSession: updateMediaSession
         },
         _entries: entries
     };
