@@ -203,8 +203,23 @@ Record which happened — different causes, different fixes:
 | What you hear | What it means |
 |---|---|
 | Continues indefinitely | It works. |
-| Stops **immediately** on lock | The audio session is not taking effect. |
+| Stops **immediately** on lock | The audio session is not taking effect. **Grab the audio diagnostics — see below.** |
 | Stops after **~30s–3min** | WebKit's media process is being suspended. **Note the timing** — "died at 25 seconds" and "good for 8 minutes" imply different apps. |
+
+### Get the audio diagnostics
+
+This is the single most useful thing you can attach to a media bug report.
+
+1. Play something, then lock and unlock so the failure has happened.
+2. Open the **Log** (the lines button in the toolbar).
+3. Tap **Audio diagnostics**, then **Copy**.
+
+It reports what the audio session actually was — category, mode, whether it was
+active, the output route, and any error. *"Audio stopped"* names no cause;
+*"session inactive, category soloAmbient"* names one exactly.
+
+The log also now records every audio-session activation and failure as it
+happens, so the lines above the diagnostics are worth including too.
 
 Post the result on [issue #1](https://github.com/huukhanh/oriel/issues/1) with
 your **iPhone model and iOS version** — behaviour differs across both.

@@ -73,6 +73,19 @@ final class AppModel: ObservableObject {
         media.resumeAfterInterruption = { [weak self] in
             self?.runMediaCommand(.play)
         }
+        // Audio-session events reach the log, so a failure is copyable off the
+        // device instead of invisible.
+        media.log = { [weak self] level, message in
+            self?.record(
+                LogEntry(
+                    id: UUID(),
+                    at: Date(),
+                    scriptID: "audio",
+                    level: level,
+                    message: message
+                )
+            )
+        }
         media.apply(settings: state.settings)
     }
 
@@ -110,6 +123,23 @@ final class AppModel: ObservableObject {
         if log.count > AppModel.maxLogEntries {
             log.removeFirst(log.count - AppModel.maxLogEntries)
         }
+    }
+
+    /// Appends a snapshot of the audio session to the log, for a bug report.
+    ///
+    /// "Audio stopped" is not actionable. "The session was inactive with
+    /// category soloAmbient" is, and there is no other way to learn that from
+    /// a phone.
+    func logMediaDiagnostics() {
+        record(
+            LogEntry(
+                id: UUID(),
+                at: Date(),
+                scriptID: "audio",
+                level: "log",
+                message: "diagnostics —\n" + media.diagnostics()
+            )
+        )
     }
 
     func clearLog() {
