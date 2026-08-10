@@ -25,6 +25,7 @@ let server;
 beforeAll(async () => {
     browser = await webkit.launch({ timeout: LAUNCH_TIMEOUT });
     server = await startServer({
+        "/empty": { body: "<!doctype html><html><body><p>nothing to play</p></body></html>" },
         "/": {
             body: `<!doctype html><html><head>
                 <script>
@@ -311,6 +312,92 @@ describe("speed-hud", () => {
         });
         expect(after.hud, "the control outlived the script").toBe(false);
         expect(after.rate, "the page was left sped up after switching off").toBe(1);
+        await context.close();
+    });
+});
+
+describe("playsinline — AirPlay availability", () => {
+    const PLAYSINLINE = wrapped("playsinline");
+
+    it("overrides a site that opted out of AirPlay", async () => {
+        // Sites set x-webkit-airplay="deny" to force you into their own app.
+        // Leaving it alone makes the toolbar's AirPlay button look broken.
+        const { context, page } = await pageWithPrelude(browser, [PLAYSINLINE]);
+        await page.goto(server.url("/"));
+        const attr = await page.evaluate(async () => {
+            const video = document.createElement("video");
+            video.setAttribute("x-webkit-airplay", "deny");
+            document.body.appendChild(video);
+            await new Promise((r) => setTimeout(r, 150));
+            return video.getAttribute("x-webkit-airplay");
+        });
+        expect(attr).toBe("allow");
+        await context.close();
+    });
+
+    it("marks AirPlay allowed on the video present at load", async () => {
+        const { context, page } = await pageWithPrelude(browser, [PLAYSINLINE]);
+        await page.goto(server.url("/"));
+        expect(
+            await page.evaluate(() => document.getElementById("v").getAttribute("x-webkit-airplay"))
+        ).toBe("allow");
+        await context.close();
+    });
+});
+
+describe("media session", () => {
+    it("claims a playback session so the OS treats it as one", async () => {
+        // A session with no action handlers is one iOS can suspend freely,
+        // because nothing has claimed it can respond. This is the mechanism
+        // #51 asks for.
+        const { context, page } = await pageWithPrelude(browser);
+        await page.goto(server.url("/"));
+        const result = await page.evaluate(() => {
+            if (!navigator.mediaSession) {
+                return "unsupported";
+            }
+            const registered = [];
+            const original = navigator.mediaSession.setActionHandler.bind(navigator.mediaSession);
+            navigator.mediaSession.setActionHandler = function (action, handler) {
+                if (handler) {
+                    registered.push(action);
+                }
+                return original(action, handler);
+            };
+            window.__inj.media.updateSession();
+            return registered.sort().join(",");
+        });
+        if (result !== "unsupported") {
+            expect(result).toContain("play");
+            expect(result).toContain("pause");
+        }
+        await context.close();
+    });
+
+    it("reports playbackState so the OS knows it is live", async () => {
+        const { context, page } = await pageWithPrelude(browser);
+        await page.goto(server.url("/"));
+        const state = await page.evaluate(() => {
+            if (!navigator.mediaSession) {
+                return "unsupported";
+            }
+            const video = document.getElementById("v");
+            Object.defineProperty(video, "paused", { value: false, configurable: true });
+            window.__inj.media.updateSession();
+            return navigator.mediaSession.playbackState;
+        });
+        if (state !== "unsupported") {
+            expect(state).toBe("playing");
+        }
+        await context.close();
+    });
+
+    it("does not throw on a page with no media", async () => {
+        const { context, page } = await pageWithPrelude(browser);
+        await page.goto(server.url("/empty"));
+        await expect(
+            page.evaluate(() => window.__inj.media.updateSession())
+        ).resolves.toBeUndefined();
         await context.close();
     });
 });
