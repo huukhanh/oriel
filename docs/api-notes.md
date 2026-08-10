@@ -49,6 +49,7 @@ two that fail *silently* and no compiler could settle:
 | `WKScriptMessageHandlerWithReply` method shape | `(…, replyHandler: @escaping (Any?, String?) -> Void)` | Swift imports it as **`async -> (Any?, String?)`** | GM storage build |
 | `XCUIApplication` | usable from a synchronous `setUp()` | it is `@MainActor`; use `setUp() async throws` | UI test build |
 | `UIAction` handler | `() -> Void` | `UIActionHandler` is **`(UIAction) -> Void`** | accessory row build |
+| Audio interruption key | `AVAudioSession.interruptionTypeKey` | top-level **`AVAudioSessionInterruptionTypeKey`**, not a static member | interruption handling |
 
 ## Found by running, not by compiling
 

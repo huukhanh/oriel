@@ -67,14 +67,11 @@ public final class AVAudioSession: @unchecked Sendable {
     public static let routeChangeNotification = Notification.Name(
         "AVAudioSessionRouteChangeNotification"
     )
-    public static let interruptionTypeKey = "AVAudioSessionInterruptionTypeKey"
 
     public enum InterruptionType: UInt, Sendable {
         case began = 1
         case ended = 0
     }
-
-    public static let interruptionOptionKey = "AVAudioSessionInterruptionOptionKey"
 
     public struct InterruptionOptions: OptionSet, Sendable {
         public let rawValue: UInt
@@ -82,3 +79,8 @@ public final class AVAudioSession: @unchecked Sendable {
         public static let shouldResume = InterruptionOptions(rawValue: 1)
     }
 }
+
+// Top-level constants, not static members of AVAudioSession — the real SDK
+// rejected `AVAudioSession.interruptionTypeKey` with "has no member".
+public let AVAudioSessionInterruptionTypeKey = "AVAudioSessionInterruptionTypeKey"
+public let AVAudioSessionInterruptionOptionKey = "AVAudioSessionInterruptionOptionKey"

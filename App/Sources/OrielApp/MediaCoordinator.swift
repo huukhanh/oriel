@@ -131,7 +131,7 @@ final class MediaCoordinator {
             object: nil,
             queue: nil
         ) { [weak self] notification in
-            let raw = notification.userInfo?[AVAudioSession.interruptionTypeKey] as? UInt
+            let raw = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
             Task { @MainActor in
                 guard let self else {
                     return
