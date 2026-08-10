@@ -35,21 +35,6 @@ struct SettingsView: View {
                         .foregroundStyle(Color.secondary)
                 }
 
-                Section("Reloads the page") {
-                    toggle("Inline playback", \.allowsInlineMediaPlayback)
-                    toggle("Picture in Picture", \.allowsPictureInPicture)
-                    toggle("Autoplay", \.allowsAutoplay)
-                    toggle("Keep cookies and logins", \.usesPersistentDataStore)
-                    toggle("JavaScript", \.allowsJavaScript)
-                }
-
-                Section("Applies immediately") {
-                    toggle("Show address bar (debug)", \.showAddressBar)
-                    toggle("Desktop site", \.useDesktopUserAgent)
-                    toggle("Keep screen awake while playing", \.disableIdleTimerDuringPlayback)
-                    toggle("Background audio", \.enableBackgroundAudio)
-                }
-
                 Section("Sleep timer") {
                     if model.state.sleepTimer.isActive {
                         HStack {
@@ -68,6 +53,21 @@ struct SettingsView: View {
                             }
                         }
                     }
+                }
+
+                Section("Reloads the page") {
+                    toggle("Inline playback", \.allowsInlineMediaPlayback)
+                    toggle("Picture in Picture", \.allowsPictureInPicture)
+                    toggle("Autoplay", \.allowsAutoplay)
+                    toggle("Keep cookies and logins", \.usesPersistentDataStore)
+                    toggle("JavaScript", \.allowsJavaScript)
+                }
+
+                Section("Applies immediately") {
+                    toggle("Show address bar (debug)", \.showAddressBar)
+                    toggle("Desktop site", \.useDesktopUserAgent)
+                    toggle("Keep screen awake while playing", \.disableIdleTimerDuringPlayback)
+                    toggle("Background audio", \.enableBackgroundAudio)
                 }
 
                 Section("About background audio") {

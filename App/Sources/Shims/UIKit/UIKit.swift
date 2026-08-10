@@ -14,6 +14,7 @@ open class UIResponder: NSObject {}
 @MainActor
 open class UIView: UIResponder {
     public var frame: CGRect = .zero
+    public var accessibilityIdentifier: String?
     public var isHidden: Bool = false
     public var backgroundColor: UIColor?
     public func addSubview(_ view: UIView) {}

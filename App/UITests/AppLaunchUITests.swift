@@ -93,10 +93,17 @@ final class AppLaunchUITests: XCTestCase {
 
     func testToolbarIsPresent() {
         XCTAssertTrue(app.buttons["toolbar.home"].waitForExistence(timeout: 20))
+        // AirPlay is an AVRoutePickerView, not a UIButton, so it does not
+        // appear in `app.buttons` — `descendants` finds it whatever UIKit
+        // decides to call it.
+        XCTAssertTrue(
+            app.descendants(matching: .any)["toolbar.airplay"].waitForExistence(timeout: 10),
+            "the AirPlay picker is missing from the toolbar"
+        )
+
         for identifier in [
             "toolbar.reload",
             "toolbar.pip",
-            "toolbar.airplay",
             "toolbar.scripts",
             "toolbar.log",
             "toolbar.home",
