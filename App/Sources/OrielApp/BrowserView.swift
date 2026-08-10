@@ -106,7 +106,6 @@ struct BrowserView: View {
             // AirPlay in the toolbar.
             AirPlayButton()
                 .frame(width: 34, height: 34)
-                .accessibilityIdentifier("toolbar.airplay")
 
             Button(action: { showingScripts = true }) {
                 // The count is the point: "3 scripts active here" is the fast

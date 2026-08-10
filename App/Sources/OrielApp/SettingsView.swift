@@ -35,6 +35,26 @@ struct SettingsView: View {
                         .foregroundStyle(Color.secondary)
                 }
 
+                Section("Sleep timer") {
+                    if model.state.sleepTimer.isActive {
+                        HStack {
+                            Text("Stops in")
+                            Spacer()
+                            Text(model.state.sleepTimer.label())
+                                .foregroundStyle(Color.secondary)
+                        }
+                        Button("Cancel timer", role: .destructive) {
+                            model.cancelSleepTimer()
+                        }
+                    } else {
+                        ForEach(SleepTimer.presets, id: \.self) { minutes in
+                            Button("\(minutes) minutes") {
+                                model.startSleepTimer(minutes: minutes)
+                            }
+                        }
+                    }
+                }
+
                 Section("Reloads the page") {
                     toggle("Inline playback", \.allowsInlineMediaPlayback)
                     toggle("Picture in Picture", \.allowsPictureInPicture)

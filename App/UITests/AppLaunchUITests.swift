@@ -27,6 +27,27 @@ final class AppLaunchUITests: XCTestCase {
         app.launch()
     }
 
+    /// Find an element, scrolling if it is below the fold.
+    ///
+    /// The runner picks whatever iPhone the image has — currently an SE, the
+    /// smallest — and SwiftUI's `Form` is lazy, so a row further down the
+    /// settings screen is not merely off-screen but *not built*. Reordering the
+    /// UI to keep tests happy is the tail wagging the dog; scrolling is what a
+    /// person does.
+    @discardableResult
+    private func scrollTo(_ element: XCUIElement, swipes: Int = 6) -> Bool {
+        if element.waitForExistence(timeout: 3) {
+            return true
+        }
+        for _ in 0..<swipes {
+            app.swipeUp()
+            if element.exists {
+                return true
+            }
+        }
+        return element.exists
+    }
+
     /// The one that matters most. An app that traps during `AppModel.init` —
     /// a bad store path, a missing bundle resource — fails here and nowhere
     /// else in this project.
@@ -54,7 +75,7 @@ final class AppLaunchUITests: XCTestCase {
         app.buttons["toolbar.settings"].tap()
 
         let toggle = app.switches["Show address bar (debug)"]
-        XCTAssertTrue(toggle.waitForExistence(timeout: 10), "the toggle is missing from Settings")
+        XCTAssertTrue(scrollTo(toggle), "the toggle is missing from Settings")
 
         let before = toggle.value as? String
         // Tap the right-hand side, where the switch actually is. A plain
@@ -93,10 +114,17 @@ final class AppLaunchUITests: XCTestCase {
 
     func testToolbarIsPresent() {
         XCTAssertTrue(app.buttons["toolbar.home"].waitForExistence(timeout: 20))
+        // AirPlay is an AVRoutePickerView, not a UIButton, so it does not
+        // appear in `app.buttons` — `descendants` finds it whatever UIKit
+        // decides to call it.
+        XCTAssertTrue(
+            app.descendants(matching: .any)["toolbar.airplay"].waitForExistence(timeout: 10),
+            "the AirPlay picker is missing from the toolbar"
+        )
+
         for identifier in [
             "toolbar.reload",
             "toolbar.pip",
-            "toolbar.airplay",
             "toolbar.scripts",
             "toolbar.log",
             "toolbar.home",
@@ -131,7 +159,7 @@ final class AppLaunchUITests: XCTestCase {
         app.buttons["toolbar.settings"].tap()
 
         let row = app.buttons["settings.scripts"]
-        XCTAssertTrue(row.waitForExistence(timeout: 10), "Settings has no Scripts row")
+        XCTAssertTrue(scrollTo(row), "Settings has no Scripts row")
         row.tap()
 
         XCTAssertTrue(
@@ -152,14 +180,35 @@ final class AppLaunchUITests: XCTestCase {
             .matching(NSPredicate(format: "label CONTAINS[c] %@", "Reloads the page"))
             .firstMatch
         XCTAssertTrue(
-            reloadHeader.waitForExistence(timeout: 15),
+            scrollTo(reloadHeader),
             "the settings screen does not warn which toggles throw the page away"
         )
 
         // The toggles themselves matter more than the headers: one from each
         // group proves the split reached the screen.
-        XCTAssertTrue(app.switches["Inline playback"].exists, "config-group toggle missing")
-        XCTAssertTrue(app.switches["Desktop site"].exists, "live-group toggle missing")
+        XCTAssertTrue(scrollTo(app.switches["Inline playback"]), "config-group toggle missing")
+        XCTAssertTrue(scrollTo(app.switches["Desktop site"]), "live-group toggle missing")
+    }
+
+    /// The sleep timer is reachable and reflects its state — §3's media list.
+    func testSleepTimerIsInSettings() {
+        XCTAssertTrue(app.buttons["toolbar.home"].waitForExistence(timeout: 20))
+        app.buttons["toolbar.settings"].tap()
+
+        let preset = app.buttons["30 minutes"]
+        XCTAssertTrue(scrollTo(preset), "no sleep timer presets in Settings")
+        preset.tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Stops in"].waitForExistence(timeout: 10),
+            "starting the timer did not change the row"
+        )
+        XCTAssertTrue(
+            app.buttons["Cancel timer"].exists,
+            "an active timer must be cancellable, or it cannot be undone"
+        )
+        app.buttons["Cancel timer"].tap()
+        XCTAssertTrue(app.buttons["30 minutes"].waitForExistence(timeout: 10))
     }
 
     func testLogOpensAndIsEmptyOnACleanLaunch() {

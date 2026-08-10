@@ -13,6 +13,11 @@ struct AirPlayButton: UIViewRepresentable {
 
     func makeUIView(context: UIViewRepresentableContext<AirPlayButton>) -> AVRoutePickerView {
         let view = AVRoutePickerView()
+        // Set here rather than with SwiftUI's .accessibilityIdentifier: that
+        // modifier does not reach through a UIViewRepresentable to the UIKit
+        // view, so the control was unfindable — including by anything
+        // assistive, not only by tests.
+        view.accessibilityIdentifier = "toolbar.airplay"
         // The app is a browser whose audio is nearly always video, so video
         // routes (Apple TV) should sort above audio-only ones.
         view.prioritizesVideoDevices = true
