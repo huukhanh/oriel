@@ -208,12 +208,15 @@ restores the page exactly. They need only a toggle to reach the user.
 
 **Opportunistic (ships, but nothing depends on it):**
 
-4. `AVAudioSession` lifecycle + `UIBackgroundModes: audio`. Cheap, required for
-   PiP audio to behave anyway, and works if the platform cooperates. No other
-   feature's correctness may depend on it.
-5. Now Playing info and remote commands — owned by `MediaCoordinator` in Swift,
-   fed by JS events over the bridge, never implemented in JS.
-6. Sleep timer.
+4. ✅ `AVAudioSession` lifecycle + `UIBackgroundModes: audio`. Cheap, required
+   for PiP audio to behave anyway, and works if the platform cooperates. No
+   other feature's correctness may depend on it.
+5. ✅ Now Playing info **and remote commands** — owned by `MediaCoordinator`,
+   fed by JS events over the bridge, never implemented in JS. The commands were
+   missing until #37: the card appeared and nothing listened.
+6. ✅ Sleep timer — an absolute deadline, not a countdown, because a `Timer`
+   does not fire while the app is suspended.
+7. ✅ AirPlay picker (`AVRoutePickerView`), which §4.3 lists in the toolbar.
 
 Native `AVPlayer` handoff (§7.5) is cut off mid-sentence in the source document
 and is not planned until the full text is available.
