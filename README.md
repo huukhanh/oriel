@@ -47,7 +47,9 @@ certificate — plus the errors you will actually hit:
 - **Keep playing in background** — stops sites that pause themselves the moment
   you switch away. Shipped as an editable built-in script, so when a site
   changes you patch the script instead of waiting for an app update.
-- **Force inline playback** and a **Picture-in-Picture** button.
+- **Force inline playback**, a **Picture-in-Picture** button, an **AirPlay**
+  picker, and lock-screen controls that actually drive the page.
+- **Playback speed** on any video, remembered per site, and a **sleep timer**.
 - **Persistent logins**, desktop/mobile user agent, bookmark launcher.
 
 ## How it is verified

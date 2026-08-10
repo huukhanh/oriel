@@ -132,6 +132,7 @@ Each step names how it fails, because "it didn't work" is not actionable.
 | 1 | Launch Oriel | YouTube loading, six buttons along the bottom, **no address bar** | Immediate crash → not signed correctly; reinstall |
 | 2 | Tap the **lines** button (Log) | Empty — *"No output yet"* | A red `prelude.js is missing from the bundle` means the build is broken. Report it; nothing below will work |
 | 3 | Tap the **{}** button | Three built-ins: **Keep playing in background**, **Force inline playback**, **Playback speed** | An empty list means the scripts did not reach the bundle |
+| 6 | Settings → tap **30 minutes** under Sleep timer | The row changes to *Stops in 30 minutes*, with a Cancel | — |
 | 4 | Tap the **house** button, type `example.com`, press Go | Loads `https://example.com` | — |
 | 5 | House button again, type `hello world` | A DuckDuckGo **search**, not a failed navigation | — |
 | 6 | House button again | The site you just visited is under **Recent** | — |
@@ -173,7 +174,22 @@ test — identical behaviour both ways means the script is not running.
 - `Picture in Picture: unsupported` — the site's player refuses it
 - nothing logged — PiP was requested and the system declined
 
-### 4.3 Background audio with the screen locked — *unknown, please record*
+### 4.3 Lock screen and AirPlay — *should work*
+
+1. Play a video, then lock the screen.
+2. **Expect:** a Now Playing card with the page title, and **play/pause that
+   actually stops and starts the video** — that is the part that was broken
+   until v0.10.0. The 15-second skip buttons should move it too.
+3. Squeeze the headphone remote, if you have one. That sends
+   `togglePlayPause`, which is a different command from play or pause and was
+   doing nothing at all before.
+4. Tap the **AirPlay** button in the toolbar. Expect the system picker, and
+   audio moving to whatever you choose.
+
+**If the card appears but the buttons do nothing**, that is the exact shape of
+the old bug — worth reporting with the model and iOS version.
+
+### 4.4 Background audio with the screen locked — *unknown, please record*
 
 Never verified on hardware. Per
 [decision 004](docs/decisions/004-background-audio-unverified.md) the app is
@@ -192,6 +208,14 @@ Record which happened — different causes, different fixes:
 
 Post the result on [issue #1](https://github.com/huukhanh/oriel/issues/1) with
 your **iPhone model and iOS version** — behaviour differs across both.
+
+### 4.5 Sleep timer
+
+Settings → **Sleep timer** → a preset. Play something and leave it.
+
+**Expect:** playback stops when the deadline passes, *including if the phone was
+locked the whole time*. It is checked against a wall-clock deadline rather than
+a countdown, precisely because a timer does not run while the app is suspended.
 
 ---
 
