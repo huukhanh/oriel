@@ -60,6 +60,15 @@ struct LogView: View {
                         UIPasteboard.general.string = LogView.transcript(of: entries)
                     }
                 }
+                ToolbarItem(placement: .bottomBar) {
+                    // The audio session's real state, on demand. Media bugs
+                    // here are otherwise reported as "it stopped", which names
+                    // no cause.
+                    Button("Audio diagnostics") {
+                        model.logMediaDiagnostics()
+                    }
+                    .accessibilityIdentifier("log.diagnostics")
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Clear") { model.clearLog() }
                 }

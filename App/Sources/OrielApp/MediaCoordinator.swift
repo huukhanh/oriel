@@ -31,6 +31,15 @@ final class MediaCoordinator {
     /// being fatal.
     private(set) var lastError: String?
 
+    /// Where audio-session events go.
+    ///
+    /// Added because `lastError` was captured and never read: every activation
+    /// failure since the project started was discarded silently, which is
+    /// exactly why "stops immediately on lock" could not be diagnosed from
+    /// here. The session's actual state now reaches the in-app log, where it
+    /// can be copied out of a device.
+    var log: (@MainActor (String, String) -> Void)?
+
     /// Tokens from `addTarget`. Kept because dropping them leaks the handler
     /// for the lifetime of the process, and a second registration would then
     /// mean the lock-screen button fires twice.
@@ -43,7 +52,7 @@ final class MediaCoordinator {
     func apply(settings: Settings) {
         self.settings = settings
         if settings.enableBackgroundAudio {
-            activateSession()
+            activateSession(reason: "launch")
         }
         updateIdleTimer()
         registerRemoteCommands()
@@ -109,9 +118,13 @@ final class MediaCoordinator {
 
     /// Called from the page bridge when playback starts or stops.
     func setPlaying(_ playing: Bool) {
+        let wasPlaying = isPlaying
         isPlaying = playing
-        if playing {
-            activateSession()
+        // Re-assert on every transition into playing. The session must be live
+        // at the moment the screen locks, and that moment is much closer to
+        // "playback started" than to "app launched".
+        if playing, wasPlaying == false {
+            activateSession(reason: "playback started")
         }
         updateIdleTimer()
     }
@@ -139,8 +152,9 @@ final class MediaCoordinator {
                 if raw == AVAudioSession.InterruptionType.began.rawValue {
                     // The system has already deactivated it; just record that.
                     self.isSessionActive = false
+                    self.log?("log", "audio session interrupted")
                 } else {
-                    self.activateSession()
+                    self.activateSession(reason: "interruption ended")
                     self.resumeAfterInterruption?()
                 }
             }
@@ -150,15 +164,24 @@ final class MediaCoordinator {
     /// Called after an interruption ends, so the page can resume.
     var resumeAfterInterruption: (@MainActor () -> Void)?
 
-    /// Activating once at launch is not enough.
+    /// Assert the playback session.
     ///
-    /// Another app taking the session deactivates ours, and an interruption —
-    /// a call, an alarm — does the same. If we only ever activate at startup,
-    /// the first phone call silently ends background playback for the rest of
-    /// the session. So this is called again whenever playback starts, and the
-    /// already-active guard makes that cheap.
-    private func activateSession() {
-        guard settings.enableBackgroundAudio, isSessionActive == false else {
+    /// **Not guarded by a cached "already active" flag**, and that is the
+    /// point. iOS can deactivate our session without telling us — another app
+    /// takes it, an interruption ends it, or it is simply reclaimed while the
+    /// app sits idle with nothing playing. Trusting a flag we set at launch
+    /// meant that by the time the user actually played something and locked
+    /// the screen, the session could be long gone and we would never
+    /// re-assert it.
+    ///
+    /// That is the most likely cause of "audio stops the instant I lock",
+    /// which is the reported symptom in #51.
+    ///
+    /// Re-asserting is cheap and idempotent, so it runs on every playback
+    /// start rather than once.
+    private func activateSession(reason: String) {
+        guard settings.enableBackgroundAudio else {
+            log?("warn", "background audio is switched off in Settings")
             return
         }
         do {
@@ -169,8 +192,18 @@ final class MediaCoordinator {
             try session.setActive(true, options: [])
             isSessionActive = true
             lastError = nil
+            log?(
+                "log",
+                "audio session active (\(reason)) — category=\(session.category.rawValue) "
+                    + "mode=\(session.mode.rawValue) out=\(describeOutputs())"
+            )
         } catch {
+            isSessionActive = false
             lastError = "audio session: \(error)"
+            // Surfaced, not swallowed. An inactive session is precisely why
+            // playback would stop the moment the screen locks, and until now
+            // this error went nowhere.
+            log?("error", "audio session FAILED (\(reason)): \(error)")
         }
     }
 
@@ -183,6 +216,7 @@ final class MediaCoordinator {
             isSessionActive = false
         } catch {
             lastError = "audio session deactivate: \(error)"
+            log?("warn", "audio session deactivate failed: \(error)")
         }
     }
 
@@ -191,6 +225,28 @@ final class MediaCoordinator {
     private func updateIdleTimer() {
         UIApplication.shared.isIdleTimerDisabled =
             settings.disableIdleTimerDuringPlayback && isPlaying
+    }
+
+    /// A copyable snapshot for a bug report. The whole reason this exists is
+    /// that "audio stopped" is not actionable and "the session was inactive
+    /// with category soloAmbient" is.
+    /// Which route audio is currently going to. Named in the log because
+    /// "playing to the earpiece" and "playing to AirPlay" are different bugs.
+    func describeOutputs() -> String {
+        let outputs = session.currentRoute.outputs.map { $0.portType.rawValue }
+        return outputs.isEmpty ? "none" : outputs.joined(separator: ",")
+    }
+
+    func diagnostics() -> String {
+        var lines: [String] = []
+        lines.append("background audio setting: \(settings.enableBackgroundAudio)")
+        lines.append("session believed active: \(isSessionActive)")
+        lines.append("category: \(session.category.rawValue)")
+        lines.append("mode: \(session.mode.rawValue)")
+        lines.append("outputs: \(describeOutputs())")
+        lines.append("playing: \(isPlaying)")
+        lines.append("last error: \(lastError ?? "none")")
+        return lines.joined(separator: "\n")
     }
 
     func nowPlaying(title: String, duration: Double, elapsed: Double, rate: Double) {
