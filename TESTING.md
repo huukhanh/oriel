@@ -206,6 +206,22 @@ Record which happened — different causes, different fixes:
 | Stops **immediately** on lock | The audio session is not taking effect. **Grab the audio diagnostics — see below.** |
 | Stops after **~30s–3min** | WebKit's media process is being suspended. **Note the timing** — "died at 25 seconds" and "good for 8 minutes" imply different apps. |
 
+### The three-way experiment
+
+If audio stops on lock, these three runs narrow it decisively. Each takes a
+minute, and the **Log** (lines button → **Copy**) is the output.
+
+| # | Do this | If audio survives | If it stops |
+|---|---|---|---|
+| 1 | A page with a plain **`<audio>`** element, or a music site | iOS is pausing **video** specifically — expected platform behaviour, and PiP is the answer | the audio session itself is not being honoured |
+| 2 | A video, but tap **PiP** *before* locking | PiP is the supported route for video, as §7.1 says | PiP is not surviving lock either |
+| 3 | A video with **"Keep playing in background" switched off** in `{}` | the visibility spoof is keeping the page rendering video, and that is what gets the app suspended | the spoof is not implicated |
+
+Run 1 is the most informative. iOS deliberately suspends **video** on lock in a
+web view; **audio-only** is the case the background mode is meant to cover. If 1
+survives and 2 stops, this is a platform limit rather than a bug, and the app's
+honest answer is the PiP button.
+
 ### Get the audio diagnostics
 
 This is the single most useful thing you can attach to a media bug report.
@@ -215,7 +231,16 @@ This is the single most useful thing you can attach to a media bug report.
 3. Tap **Audio diagnostics**, then **Copy**.
 
 It reports what the audio session actually was — category, mode, whether it was
-active, the output route, and any error. *"Audio stopped"* names no cause;
+active, the output route, and any error.
+
+The log also records **why** an interruption happened and **when the app was
+backgrounded**, which is the pairing that matters:
+
+- `interrupted — reason=appWasSuspended` means iOS suspended the whole app, so
+  background audio was never granted. That is a different fault from another
+  app taking the session.
+- An interruption *immediately* after `app backgrounded` points at the lock
+  itself; one twenty seconds later points at something else. *"Audio stopped"* names no cause;
 *"session inactive, category soloAmbient"* names one exactly.
 
 The log also now records every audio-session activation and failure as it
