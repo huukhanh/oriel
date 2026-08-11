@@ -2,67 +2,85 @@ import XCTest
 
 @testable import Core
 
-/// Pins the rules that broke playback three times.
+/// Pins the rules that broke playback three times running.
 ///
-/// `WKWebView` runs its own `AudioSession`; every session call the app makes
-/// interrupts WebKit's. These tests exist so "configure once, then leave it
-/// alone" is enforced rather than remembered.
+/// The governing fact, established from device logs rather than reasoning:
+/// `WKWebView` runs its own `AudioSession` in the WebContent process, and every
+/// `setActive(true)` the app makes seizes it — producing an interruption that
+/// stops the playback it was meant to protect.
 final class AudioSessionPolicyTests: XCTestCase {
 
-    private func state(enabled: Bool = true, active: Bool = false, playing: Bool = false)
-        -> AudioSessionPolicy.State
-    {
-        AudioSessionPolicy.State(enabled: enabled, isActive: active, isPlaying: playing)
+    private func state(
+        enabled: Bool = true,
+        configured: Bool = false,
+        playing: Bool = false
+    ) -> AudioSessionPolicy.State {
+        AudioSessionPolicy.State(enabled: enabled, hasConfigured: configured, isPlaying: playing)
     }
 
-    func testActivatesWhenNotYetActive() {
-        XCTAssertTrue(AudioSessionPolicy.shouldActivate(state(active: false)))
-    }
-
-    /// The regression. A busy page emits media events several times a second,
-    /// and each session call interrupts WebKit's own session — which is
-    /// audible as playback stopping.
-    func testDoesNotReactivateAnAlreadyActiveSession() {
+    /// The rule the device logs forced.
+    func testTheAppNeverActivatesTheSession() {
         XCTAssertFalse(
-            AudioSessionPolicy.shouldActivate(state(active: true, playing: true)),
-            "re-asserting an active session interrupts WKWebView's own AudioSession"
+            AudioSessionPolicy.appShouldActivateSession,
+            "every setActive(true) seizes the session WKWebView is using and interrupts it"
         )
     }
 
-    func testNeverActivatesWhenTheUserTurnedItOff() {
-        XCTAssertFalse(AudioSessionPolicy.shouldActivate(state(enabled: false, active: false)))
-        XCTAssertFalse(AudioSessionPolicy.shouldActivate(state(enabled: false, playing: true)))
+    func testConfiguresOnceAtLaunch() {
+        XCTAssertTrue(AudioSessionPolicy.shouldConfigure(state(configured: false)))
+        XCTAssertFalse(AudioSessionPolicy.shouldConfigure(state(configured: true)))
     }
 
-    /// After an interruption the session is genuinely gone, so activating
-    /// again is correct — that is the one case the guard must not block.
-    func testActivatesAgainAfterAnInterruptionInvalidatedTheSession() {
-        XCTAssertTrue(AudioSessionPolicy.shouldActivate(state(active: false, playing: true)))
+    func testNeverConfiguresWhenTheUserTurnedItOff() {
+        XCTAssertFalse(AudioSessionPolicy.shouldConfigure(state(enabled: false)))
     }
 
-    /// The other half of the loop: resuming unconditionally produced a play
-    /// event, which produced a session call, which interrupted WebKit again.
-    func testOnlyResumesWhenTheSystemAsks() {
-        XCTAssertTrue(AudioSessionPolicy.shouldResume(systemSaysResume: true, enabled: true))
-        XCTAssertFalse(
-            AudioSessionPolicy.shouldResume(systemSaysResume: false, enabled: true),
-            "resuming uninvited is what closed the interrupt/resume loop"
-        )
-        XCTAssertFalse(AudioSessionPolicy.shouldResume(systemSaysResume: true, enabled: false))
-    }
+    /// The loop, reproduced as a test.
+    ///
+    /// Keying on "is the session active" was not enough: an interruption clears
+    /// that flag, which re-arms configuration, which causes the next
+    /// interruption. Keying on "have we configured this launch" is immune,
+    /// because interruptions do not change it.
+    func testInterruptionsDoNotReArmConfiguration() {
+        var hasConfigured = false
+        var calls = 0
 
-    /// Ten media events in a row must produce exactly one activation.
-    func testRepeatedPlayEventsProduceASingleActivation() {
-        var isActive = false
-        var activations = 0
-        for _ in 0..<10 {
-            if AudioSessionPolicy.shouldActivate(
-                state(enabled: true, active: isActive, playing: true)
+        for _ in 0..<20 {
+            if AudioSessionPolicy.shouldConfigure(
+                state(enabled: true, configured: hasConfigured, playing: true)
             ) {
-                activations += 1
-                isActive = true
+                calls += 1
+                hasConfigured = true
+            }
+            // An interruption arrives after every call — exactly what the
+            // device showed. It must not re-open the loop.
+        }
+
+        XCTAssertEqual(
+            calls, 1,
+            "interruptions re-armed configuration and produced a session-call loop"
+        )
+    }
+
+    func testABusyPageProducesASingleConfiguration() {
+        var hasConfigured = false
+        var calls = 0
+        for _ in 0..<50 {
+            if AudioSessionPolicy.shouldConfigure(
+                state(enabled: true, configured: hasConfigured, playing: true)
+            ) {
+                calls += 1
+                hasConfigured = true
             }
         }
-        XCTAssertEqual(activations, 1, "a busy page must not produce a burst of session calls")
+        XCTAssertEqual(calls, 1)
+    }
+
+    /// The other half of the loop: resuming uninvited produced a play event,
+    /// which produced a session call, which interrupted WebKit again.
+    func testOnlyResumesWhenTheSystemAsks() {
+        XCTAssertTrue(AudioSessionPolicy.shouldResume(systemSaysResume: true, enabled: true))
+        XCTAssertFalse(AudioSessionPolicy.shouldResume(systemSaysResume: false, enabled: true))
+        XCTAssertFalse(AudioSessionPolicy.shouldResume(systemSaysResume: true, enabled: false))
     }
 }
