@@ -211,10 +211,42 @@ final class AppLaunchUITests: XCTestCase {
         XCTAssertTrue(app.buttons["30 minutes"].waitForExistence(timeout: 10))
     }
 
-    func testLogOpensAndIsEmptyOnACleanLaunch() {
+    /// The log is no longer empty on launch — the audio session reports itself,
+    /// which is deliberate: a media failure has to be diagnosable from the
+    /// device. What matters is that nothing has *errored*.
+    func testLogOpensWithNoErrorsOnACleanLaunch() {
         XCTAssertTrue(app.buttons["toolbar.home"].waitForExistence(timeout: 20))
         app.buttons["toolbar.log"].tap()
-        XCTAssertTrue(app.staticTexts["No output yet"].waitForExistence(timeout: 10))
+
+        // The toolbar badge is the user-visible signal, and it only appears for
+        // errors — so a clean launch must not show it.
+        XCTAssertTrue(
+            app.buttons["log.diagnostics"].waitForExistence(timeout: 10),
+            "the Log sheet did not open"
+        )
+        XCTAssertFalse(
+            app.staticTexts.matching(
+                NSPredicate(format: "label CONTAINS[c] %@", "error")
+            ).firstMatch.exists,
+            "something errored on a clean launch"
+        )
+    }
+
+    /// Media bugs are otherwise reported as "it stopped", which names no cause.
+    func testAudioDiagnosticsAreAvailable() {
+        XCTAssertTrue(app.buttons["toolbar.home"].waitForExistence(timeout: 20))
+        app.buttons["toolbar.log"].tap()
+
+        let button = app.buttons["log.diagnostics"]
+        XCTAssertTrue(button.waitForExistence(timeout: 10), "no audio diagnostics button")
+        button.tap()
+
+        XCTAssertTrue(
+            app.staticTexts.matching(
+                NSPredicate(format: "label CONTAINS[c] %@", "category")
+            ).firstMatch.waitForExistence(timeout: 10),
+            "the diagnostics did not report the audio session's category"
+        )
     }
 
     func testBookmarksSheetOpens() {
