@@ -118,12 +118,12 @@ final class MediaCoordinator {
 
     /// Called from the page bridge when playback starts or stops.
     func setPlaying(_ playing: Bool) {
-        let wasPlaying = isPlaying
         isPlaying = playing
-        // Re-assert on every transition into playing. The session must be live
-        // at the moment the screen locks, and that moment is much closer to
-        // "playback started" than to "app launched".
-        if playing, wasPlaying == false {
+        // Activate only if it is not already active — the guard inside makes
+        // this a no-op in the normal case. Media events arrive several times a
+        // second on a busy page, and turning each into a session call is what
+        // broke playback.
+        if playing {
             activateSession(reason: "playback started")
         }
         updateIdleTimer()
@@ -167,6 +167,22 @@ final class MediaCoordinator {
                         "log",
                         "audio session interruption ended — shouldResume=\(shouldResume)"
                     )
+                    // Only when the system says so.
+                    //
+                    // Resuming unconditionally is what closed the loop: our
+                    // resume produced a play event, which produced a session
+                    // call, which interrupted WebKit again. `shouldResume` is
+                    // the system telling us it is safe — absent it, the right
+                    // move is to leave playback alone.
+                    guard
+                        AudioSessionPolicy.shouldResume(
+                            systemSaysResume: shouldResume,
+                            enabled: self.settings.enableBackgroundAudio
+                        )
+                    else {
+                        self.log?("log", "not resuming — the system did not ask us to")
+                        return
+                    }
                     self.activateSession(reason: "interruption ended")
                     self.resumeAfterInterruption?()
                 }
@@ -177,24 +193,40 @@ final class MediaCoordinator {
     /// Called after an interruption ends, so the page can resume.
     var resumeAfterInterruption: (@MainActor () -> Void)?
 
-    /// Assert the playback session.
+    /// Assert the playback session — **at most once**, until something
+    /// actually invalidates it.
     ///
-    /// **Not guarded by a cached "already active" flag**, and that is the
-    /// point. iOS can deactivate our session without telling us — another app
-    /// takes it, an interruption ends it, or it is simply reclaimed while the
-    /// app sits idle with nothing playing. Trusting a flag we set at launch
-    /// meant that by the time the user actually played something and locked
-    /// the screen, the session could be long gone and we would never
-    /// re-assert it.
+    /// This guard is load-bearing, and removing it caused a regression worth
+    /// recording. `WKWebView` runs its own `AudioSession` inside the WebContent
+    /// process. Every `setCategory`/`setActive` call we make on the shared
+    /// session *interrupts WebKit's* — WebKit says so itself:
     ///
-    /// That is the most likely cause of "audio stops the instant I lock",
-    /// which is the reported symptom in #51.
+    ///     AudioSession::beginInterruption but session is already interrupted!
     ///
-    /// Re-asserting is cheap and idempotent, so it runs on every playback
-    /// start rather than once.
+    /// Re-asserting on every playback event meant four activations in four
+    /// seconds, each one interrupting the very playback it was meant to
+    /// protect. Combined with resuming after an interruption, that closed a
+    /// loop: activate → WebKit interrupted → we resume → play event →
+    /// activate. The device log showed interruptions arriving one second after
+    /// activation.
+    ///
+    /// So: configure the session once and let WebKit own playback. The flag is
+    /// cleared when an interruption genuinely invalidates it, which is the only
+    /// time re-activating is correct.
     private func activateSession(reason: String) {
         guard settings.enableBackgroundAudio else {
             log?("warn", "background audio is switched off in Settings")
+            return
+        }
+        guard
+            AudioSessionPolicy.shouldActivate(
+                AudioSessionPolicy.State(
+                    enabled: settings.enableBackgroundAudio,
+                    isActive: isSessionActive,
+                    isPlaying: isPlaying
+                )
+            )
+        else {
             return
         }
         do {

@@ -31,7 +31,8 @@ struct BrowserView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
-            case .background: model.recordScenePhase("backgrounded (screen locked or switched away)")
+            case .background:
+                model.recordScenePhase("backgrounded (screen locked or switched away)")
             case .inactive: model.recordScenePhase("inactive")
             case .active: model.recordScenePhase("foregrounded")
             @unknown default: break
