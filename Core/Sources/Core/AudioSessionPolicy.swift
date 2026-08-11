@@ -19,31 +19,44 @@ public enum AudioSessionPolicy {
     public struct State: Hashable, Sendable {
         /// Whether the user has background audio switched on.
         public var enabled: Bool
-        /// Whether we believe the session is currently active.
-        public var isActive: Bool
+        /// Whether the category has already been set this launch.
+        ///
+        /// Deliberately *not* "is the session active": an interruption clears
+        /// that, and rebuilding on it is what produced the loop.
+        public var hasConfigured: Bool
         /// Whether the page reports media playing.
         public var isPlaying: Bool
 
-        public init(enabled: Bool, isActive: Bool, isPlaying: Bool) {
+        public init(enabled: Bool, hasConfigured: Bool, isPlaying: Bool) {
             self.enabled = enabled
-            self.isActive = isActive
+            self.hasConfigured = hasConfigured
             self.isPlaying = isPlaying
         }
     }
 
-    /// Whether to call `setCategory` + `setActive` now.
+    /// Whether the app should ever call `setActive(true)`.
     ///
-    /// False when the session is already active — that is the whole point. A
-    /// busy page emits media events several times a second, and turning each
-    /// into a session call is what broke playback.
-    public static func shouldActivate(_ state: State) -> Bool {
+    /// **Never.** Kept as a named constant rather than deleted code, because
+    /// this is counter-intuitive enough that someone will try it again.
+    ///
+    /// The device evidence is unambiguous: every `setActive(true)` the app
+    /// makes is immediately followed by an interruption, because it seizes a
+    /// session `WKWebView` is already using. WebKit activates the session
+    /// itself when the page plays media — the app's job is only to declare the
+    /// *category*, which is passive configuration and does not seize anything.
+    public static let appShouldActivateSession = false
+
+    /// Whether to configure the session's category now.
+    ///
+    /// Once per launch. Guarding on "already active" was not enough: an
+    /// interruption clears that flag, which re-arms activation, which causes
+    /// the next interruption. The loop was driven by the interruptions
+    /// themselves, so the count has to be independent of them.
+    public static func shouldConfigure(_ state: State) -> Bool {
         guard state.enabled else {
             return false
         }
-        guard state.isActive == false else {
-            return false
-        }
-        return true
+        return state.hasConfigured == false
     }
 
     /// Whether to resume playback after an interruption ends.

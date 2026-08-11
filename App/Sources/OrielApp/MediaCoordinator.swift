@@ -22,7 +22,11 @@ import UIKit
 final class MediaCoordinator {
 
     private let session = AVAudioSession.sharedInstance()
-    private var isSessionActive = false
+    /// Whether the category has been set this launch.
+    ///
+    /// Deliberately not "is the session active": interruptions clear that, and
+    /// keying on it produced a configure/interrupt loop.
+    private var hasConfiguredSession = false
     private var interruptionObserver: (any NSObjectProtocol)?
     private var isPlaying = false
     private var settings = Settings()
@@ -52,7 +56,7 @@ final class MediaCoordinator {
     func apply(settings: Settings) {
         self.settings = settings
         if settings.enableBackgroundAudio {
-            activateSession(reason: "launch")
+            configureSession(reason: "launch")
         }
         updateIdleTimer()
         registerRemoteCommands()
@@ -124,7 +128,9 @@ final class MediaCoordinator {
         // second on a busy page, and turning each into a session call is what
         // broke playback.
         if playing {
-            activateSession(reason: "playback started")
+            // A no-op after the first call. Left in so a page that starts
+            // playing before the settings are applied still gets a category.
+            configureSession(reason: "playback started")
         }
         updateIdleTimer()
     }
@@ -154,7 +160,6 @@ final class MediaCoordinator {
                 }
                 if raw == AVAudioSession.InterruptionType.began.rawValue {
                     // The system has already deactivated it; just record that.
-                    self.isSessionActive = false
                     self.log?(
                         "warn",
                         "audio session interrupted — reason=\(Self.describeReason(reasonRaw))"
@@ -183,7 +188,9 @@ final class MediaCoordinator {
                         self.log?("log", "not resuming — the system did not ask us to")
                         return
                     }
-                    self.activateSession(reason: "interruption ended")
+                    // Deliberately no re-configuration here. The category
+                    // survives an interruption, and re-asserting it is what
+                    // caused the next one.
                     self.resumeAfterInterruption?()
                 }
             }
@@ -193,36 +200,32 @@ final class MediaCoordinator {
     /// Called after an interruption ends, so the page can resume.
     var resumeAfterInterruption: (@MainActor () -> Void)?
 
-    /// Assert the playback session — **at most once**, until something
-    /// actually invalidates it.
+    /// Declare the audio category — and **only** the category.
     ///
-    /// This guard is load-bearing, and removing it caused a regression worth
-    /// recording. `WKWebView` runs its own `AudioSession` inside the WebContent
-    /// process. Every `setCategory`/`setActive` call we make on the shared
-    /// session *interrupts WebKit's* — WebKit says so itself:
+    /// This is the whole of the app's involvement, and the shape of it was
+    /// forced by device logs rather than reasoning.
+    ///
+    /// `WKWebView` runs its own `AudioSession` in the WebContent process.
+    /// Setting the *category* is passive: it tells the system what kind of
+    /// audio this app produces, which is what makes background playback
+    /// possible. Calling `setActive(true)` is not passive — it seizes the
+    /// session, and WebKit is immediately interrupted:
     ///
     ///     AudioSession::beginInterruption but session is already interrupted!
     ///
-    /// Re-asserting on every playback event meant four activations in four
-    /// seconds, each one interrupting the very playback it was meant to
-    /// protect. Combined with resuming after an interruption, that closed a
-    /// loop: activate → WebKit interrupted → we resume → play event →
-    /// activate. The device log showed interruptions arriving one second after
-    /// activation.
+    /// Every activation in the reporter's log was followed within the same
+    /// second by an interruption. WebKit activates the session itself when the
+    /// page plays; the app doing it as well is a fight the user loses.
     ///
-    /// So: configure the session once and let WebKit own playback. The flag is
-    /// cleared when an interruption genuinely invalidates it, which is the only
-    /// time re-activating is correct.
-    private func activateSession(reason: String) {
-        guard settings.enableBackgroundAudio else {
-            log?("warn", "background audio is switched off in Settings")
-            return
-        }
+    /// Configured once per launch, keyed on `hasConfiguredSession` rather than
+    /// on whether the session is active — an interruption clears the latter,
+    /// which re-armed the call, which caused the next interruption.
+    private func configureSession(reason: String) {
         guard
-            AudioSessionPolicy.shouldActivate(
+            AudioSessionPolicy.shouldConfigure(
                 AudioSessionPolicy.State(
                     enabled: settings.enableBackgroundAudio,
-                    isActive: isSessionActive,
+                    hasConfigured: hasConfiguredSession,
                     isPlaying: isPlaying
                 )
             )
@@ -234,35 +237,23 @@ final class MediaCoordinator {
             // audio is nearly always video, and it is the mode AirPlay routing
             // expects.
             try session.setCategory(.playback, mode: .moviePlayback, options: [])
-            try session.setActive(true, options: [])
-            isSessionActive = true
+            hasConfiguredSession = true
             lastError = nil
             log?(
                 "log",
-                "audio session active (\(reason)) — category=\(session.category.rawValue) "
+                "audio category set (\(reason)) — category=\(session.category.rawValue) "
                     + "mode=\(session.mode.rawValue) out=\(describeOutputs())"
             )
         } catch {
-            isSessionActive = false
-            lastError = "audio session: \(error)"
-            // Surfaced, not swallowed. An inactive session is precisely why
-            // playback would stop the moment the screen locks, and until now
-            // this error went nowhere.
-            log?("error", "audio session FAILED (\(reason)): \(error)")
+            lastError = "audio category: \(error)"
+            log?("error", "setting the audio category FAILED (\(reason)): \(error)")
         }
     }
 
+    /// Nothing to deactivate: the app never activates the session, so
+    /// deactivating it would be taking something from WebKit that it owns.
     func deactivateSession() {
-        guard isSessionActive else {
-            return
-        }
-        do {
-            try session.setActive(false, options: [.notifyOthersOnDeactivation])
-            isSessionActive = false
-        } catch {
-            lastError = "audio session deactivate: \(error)"
-            log?("warn", "audio session deactivate failed: \(error)")
-        }
+        hasConfiguredSession = false
     }
 
     /// Only while media is actually playing, and cleared on pause and on
@@ -307,7 +298,8 @@ final class MediaCoordinator {
     func diagnostics() -> String {
         var lines: [String] = []
         lines.append("background audio setting: \(settings.enableBackgroundAudio)")
-        lines.append("session believed active: \(isSessionActive)")
+        lines.append("category configured: \(hasConfiguredSession)")
+        lines.append("app activates session: \(AudioSessionPolicy.appShouldActivateSession)")
         lines.append("category: \(session.category.rawValue)")
         lines.append("mode: \(session.mode.rawValue)")
         lines.append("outputs: \(describeOutputs())")
