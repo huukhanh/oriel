@@ -5,6 +5,7 @@ import SwiftUI
 /// The webview plus the toolbar. One webview, no tabs — §1's non-goal.
 struct BrowserView: View {
     @EnvironmentObject private var model: AppModel
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var showingScripts = false
     @State private var showingSettings = false
@@ -27,6 +28,14 @@ struct BrowserView: View {
             WebViewContainer(model: model, initialURL: initialURL)
                 .id(model.webViewGeneration)
             toolbar
+        }
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .background: model.recordScenePhase("backgrounded (screen locked or switched away)")
+            case .inactive: model.recordScenePhase("inactive")
+            case .active: model.recordScenePhase("foregrounded")
+            @unknown default: break
+            }
         }
         .sheet(isPresented: $showingScripts) {
             ScriptListView()

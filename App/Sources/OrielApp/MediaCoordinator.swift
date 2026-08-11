@@ -145,6 +145,9 @@ final class MediaCoordinator {
             queue: nil
         ) { [weak self] notification in
             let raw = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            let reasonRaw = notification.userInfo?[AVAudioSessionInterruptionReasonKey] as? UInt
+            let optionRaw = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt
+
             Task { @MainActor in
                 guard let self else {
                     return
@@ -152,8 +155,18 @@ final class MediaCoordinator {
                 if raw == AVAudioSession.InterruptionType.began.rawValue {
                     // The system has already deactivated it; just record that.
                     self.isSessionActive = false
-                    self.log?("log", "audio session interrupted")
+                    self.log?(
+                        "warn",
+                        "audio session interrupted — reason=\(Self.describeReason(reasonRaw))"
+                    )
                 } else {
+                    let shouldResume =
+                        (optionRaw ?? 0)
+                        & AVAudioSession.InterruptionOptions.shouldResume.rawValue != 0
+                    self.log?(
+                        "log",
+                        "audio session interruption ended — shouldResume=\(shouldResume)"
+                    )
                     self.activateSession(reason: "interruption ended")
                     self.resumeAfterInterruption?()
                 }
@@ -230,6 +243,28 @@ final class MediaCoordinator {
     /// A copyable snapshot for a bug report. The whole reason this exists is
     /// that "audio stopped" is not actionable and "the session was inactive
     /// with category soloAmbient" is.
+    /// The interruption reason in words.
+    ///
+    /// `appWasSuspended` is the one that matters: it means iOS suspended the
+    /// whole app, so the background-audio entitlement is not being granted —
+    /// a completely different problem from another app taking the session.
+    static func describeReason(_ raw: UInt?) -> String {
+        switch raw {
+        case AVAudioSession.InterruptionReason.appWasSuspended.rawValue:
+            return "appWasSuspended (iOS suspended this app — background audio not granted)"
+        case AVAudioSession.InterruptionReason.builtInMicMuted.rawValue:
+            return "builtInMicMuted"
+        case AVAudioSession.InterruptionReason.routeDisconnected.rawValue:
+            return "routeDisconnected (headphones unplugged?)"
+        case AVAudioSession.InterruptionReason.default.rawValue:
+            return "default (another app or the system took the session)"
+        case .none:
+            return "not reported (iOS < 14.5)"
+        default:
+            return "unknown(\(raw.map(String.init) ?? "nil"))"
+        }
+    }
+
     /// Which route audio is currently going to. Named in the log because
     /// "playing to the earpiece" and "playing to AirPlay" are different bugs.
     func describeOutputs() -> String {

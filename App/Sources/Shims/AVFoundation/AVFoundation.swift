@@ -73,6 +73,15 @@ public final class AVAudioSession: @unchecked Sendable {
         case ended = 0
     }
 
+    public enum InterruptionReason: UInt, Sendable {
+        case `default` = 0
+        /// The app was suspended by the system. If this is what we see on
+        /// screen lock, background audio is not being granted at all.
+        case appWasSuspended = 1
+        case builtInMicMuted = 2
+        case routeDisconnected = 4
+    }
+
     public struct InterruptionOptions: OptionSet, Sendable {
         public let rawValue: UInt
         public init(rawValue: UInt) { self.rawValue = rawValue }
@@ -84,3 +93,7 @@ public final class AVAudioSession: @unchecked Sendable {
 // rejected `AVAudioSession.interruptionTypeKey` with "has no member".
 public let AVAudioSessionInterruptionTypeKey = "AVAudioSessionInterruptionTypeKey"
 public let AVAudioSessionInterruptionOptionKey = "AVAudioSessionInterruptionOptionKey"
+/// iOS 14.5+. The field that says *why* — and the difference between
+/// "another app took the session" and "iOS suspended us" is the difference
+/// between two completely different bugs.
+public let AVAudioSessionInterruptionReasonKey = "AVAudioSessionInterruptionReasonKey"

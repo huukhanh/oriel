@@ -142,6 +142,24 @@ final class AppModel: ObservableObject {
         )
     }
 
+    /// Records the app moving between foreground and background.
+    ///
+    /// Without this, an interruption in the log cannot be lined up with the
+    /// moment the screen locked — and "interrupted 3 seconds after
+    /// backgrounding" and "interrupted 20 seconds later, unprompted" are
+    /// different faults.
+    func recordScenePhase(_ description: String) {
+        record(
+            LogEntry(
+                id: UUID(),
+                at: Date(),
+                scriptID: "app",
+                level: "log",
+                message: "app \(description)"
+            )
+        )
+    }
+
     func clearLog() {
         log.removeAll()
         errorCount = 0
