@@ -1,0 +1,81 @@
+# What a green check here does and does not mean.
+#
+# DOES: the pure logic is tested; the extension builds for all three targets;
+# the built extension loads into a real Chromium, its service worker boots, its
+# content script skins a real page, and the injection engine behaves correctly
+# in a real WebKit engine.
+#
+# DOES NOT: say anything about Safari on iOS. No CI runner can load a Safari Web
+# Extension onto a phone. That gap is the subject of docs/VERIFICATION.md and is
+# closed by a human with a device, not by this file.
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: lint + unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 11 }
+      - uses: actions/setup-node@v4
+        with: { node-version: "24", cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm test
+      # The authoring CLI has no dependencies on purpose; prove it still runs
+      # on a bare Node, and that it validates the skins this repo ships.
+      - run: node tools/oriel/bin/oriel.js check skins/*
+        if: hashFiles('tools/oriel/bin/oriel.js') != ''
+
+  build:
+    name: build all targets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 11 }
+      - uses: actions/setup-node@v4
+        with: { node-version: "24", cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      # A manifest that does not parse is an extension that cannot be installed,
+      # and the error the browser shows is not always the reason.
+      - name: manifests are valid JSON
+        run: for f in dist/*/manifest.json; do node -e "JSON.parse(require('fs').readFileSync('$f','utf8'))" || exit 1; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension
+          path: dist/
+          retention-days: 14
+
+  e2e:
+    name: real browsers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 11 }
+      - uses: actions/setup-node@v4
+        with: { node-version: "24", cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      # Runners have root, so the local-prefix staging in
+      # scripts/setup-browsers-linux.sh collapses to this.
+      - run: pnpm exec playwright install --with-deps chromium webkit
+      - run: pnpm test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-failure
+          path: |
+            test-results/
+            dist/
+          retention-days: 7

@@ -1,0 +1,950 @@
+/*
+ * Tokens first, components second. The tokens are the only place a colour or a
+ * measurement is decided; a component that invents one is a bug.
+ *
+ * Sized for a 390px iPhone held in one hand: 16px base type (anything smaller
+ * makes Safari zoom on focus), 44px minimum tap targets, and the primary
+ * navigation at the bottom of the screen where a thumb reaches. Desktop gets
+ * more room at 720px, not a different design.
+ */
+
+:root {
+    --o-bg: #f4f4f6;
+    --o-surface: #ffffff;
+    --o-inset: #ececed;
+    --o-line: #dcdce0;
+    --o-text: #17171a;
+    --o-dim: #67676f;
+    --o-accent: #4a45c8;
+    --o-accent-ink: #ffffff;
+    --o-danger: #a52019;
+    --o-warn: #8a5a00;
+    --o-ok: #14664a;
+    --o-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 6px 16px rgb(0 0 0 / 0.05);
+
+    --o-1: 4px;
+    --o-2: 8px;
+    --o-3: 12px;
+    --o-4: 16px;
+    --o-5: 24px;
+    --o-6: 32px;
+
+    --o-tap: 44px;
+    --o-radius: 12px;
+    --o-radius-sm: 8px;
+
+    --o-font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --o-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --o-speed: 140ms;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --o-bg: #131316;
+        --o-surface: #1c1c20;
+        --o-inset: #26262c;
+        --o-line: #33333a;
+        --o-text: #ececf0;
+        --o-dim: #9a9aa4;
+        --o-accent: #9a95ff;
+        --o-accent-ink: #16161c;
+        --o-danger: #ff9b93;
+        --o-warn: #f0bd63;
+        --o-ok: #6fd6ae;
+        --o-shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 6px 16px rgb(0 0 0 / 0.35);
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+.o-body {
+    margin: 0;
+    background: var(--o-bg);
+    color: var(--o-text);
+    font-family: var(--o-font);
+    font-size: 16px;
+    line-height: 1.45;
+    -webkit-text-size-adjust: 100%;
+    -webkit-font-smoothing: antialiased;
+}
+
+.o-body-popup {
+    width: 380px;
+    max-width: 100vw;
+}
+
+.o-body-manager {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+h1,
+h2,
+p,
+ul,
+ol {
+    margin: 0;
+}
+
+ul,
+ol {
+    padding: 0;
+    list-style: none;
+}
+
+button,
+input,
+select,
+textarea {
+    font: inherit;
+    color: inherit;
+}
+
+:focus-visible {
+    outline: 2px solid var(--o-accent);
+    outline-offset: 2px;
+    border-radius: var(--o-radius-sm);
+}
+
+/* ------------------------------------------------------------- app shell */
+
+.o-appbar {
+    display: flex;
+    align-items: baseline;
+    gap: var(--o-3);
+    padding: var(--o-3) var(--o-4);
+    padding-top: calc(var(--o-3) + env(safe-area-inset-top));
+    border-bottom: 1px solid var(--o-line);
+    background: var(--o-surface);
+}
+
+.o-brand {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.o-status {
+    font-size: 13px;
+    color: var(--o-dim);
+    min-height: 1em;
+}
+
+.o-status.is-error {
+    color: var(--o-danger);
+}
+
+.o-main {
+    flex: 1;
+    order: 2;
+    width: 100%;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: var(--o-4);
+    padding-bottom: calc(var(--o-tap) + var(--o-6) + env(safe-area-inset-bottom));
+}
+
+.o-tabbar {
+    position: fixed;
+    inset: auto 0 0 0;
+    order: 3;
+    display: flex;
+    background: var(--o-surface);
+    border-top: 1px solid var(--o-line);
+    /* Clears the iPhone home indicator. */
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+.o-tab {
+    flex: 1;
+    min-height: var(--o-tap);
+    border: 0;
+    background: none;
+    color: var(--o-dim);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    padding: var(--o-2);
+    border-top: 2px solid transparent;
+}
+
+.o-tab.is-active {
+    color: var(--o-accent);
+    border-top-color: var(--o-accent);
+}
+
+.o-app {
+    padding: var(--o-3);
+}
+
+/* ----------------------------------------------------------- primitives */
+
+.o-view {
+    display: flex;
+    flex-direction: column;
+    gap: var(--o-4);
+}
+
+.o-card {
+    background: var(--o-surface);
+    border: 1px solid var(--o-line);
+    border-radius: var(--o-radius);
+    padding: var(--o-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--o-3);
+}
+
+.o-card-title {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--o-dim);
+}
+
+.o-card-foot,
+.o-pane-foot,
+.o-vars-foot {
+    display: flex;
+    gap: var(--o-2);
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.o-quiet {
+    color: var(--o-dim);
+    font-size: 14px;
+}
+
+.o-note {
+    color: var(--o-dim);
+    font-size: 14px;
+    background: var(--o-inset);
+    border-radius: var(--o-radius-sm);
+    padding: var(--o-2) var(--o-3);
+}
+
+.o-title {
+    font-size: 22px;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+}
+
+.o-sub,
+.o-desc {
+    color: var(--o-dim);
+    font-size: 14px;
+}
+
+.o-what {
+    font-size: 14px;
+}
+
+.o-link {
+    color: var(--o-accent);
+    text-decoration: none;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--o-1);
+}
+
+.o-button {
+    min-height: var(--o-tap);
+    padding: 0 var(--o-4);
+    border: 1px solid var(--o-line);
+    border-radius: var(--o-radius-sm);
+    background: var(--o-surface);
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background var(--o-speed) ease;
+}
+
+.o-button:hover:not(:disabled) {
+    background: var(--o-inset);
+}
+
+.o-button:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.o-button.o-primary {
+    background: var(--o-accent);
+    border-color: var(--o-accent);
+    color: var(--o-accent-ink);
+}
+
+.o-button.o-danger {
+    color: var(--o-danger);
+}
+
+.o-linkbutton {
+    border: 0;
+    background: none;
+    color: var(--o-accent);
+    font-size: 14px;
+    cursor: pointer;
+    min-height: var(--o-tap);
+    padding: 0 var(--o-2);
+}
+
+.o-icon {
+    width: var(--o-tap);
+    height: var(--o-tap);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: var(--o-radius-sm);
+    background: none;
+    color: var(--o-dim);
+    cursor: pointer;
+}
+
+.o-icon:disabled {
+    opacity: 0.3;
+    cursor: default;
+}
+
+.o-input,
+.o-select {
+    width: 100%;
+    min-height: var(--o-tap);
+    padding: 0 var(--o-3);
+    border: 1px solid var(--o-line);
+    border-radius: var(--o-radius-sm);
+    background: var(--o-surface);
+}
+
+.o-toolbar {
+    display: flex;
+    gap: var(--o-2);
+    flex-wrap: wrap;
+}
+
+/* -------------------------------------------------------------- switches */
+
+.o-switch {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    width: 52px;
+    height: var(--o-tap);
+    cursor: pointer;
+}
+
+.o-switch input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+}
+
+.o-switch-track {
+    width: 52px;
+    height: 31px;
+    border-radius: 999px;
+    background: var(--o-inset);
+    border: 1px solid var(--o-line);
+    transition: background var(--o-speed) ease;
+    display: block;
+}
+
+.o-switch-thumb {
+    display: block;
+    width: 25px;
+    height: 25px;
+    margin: 2px;
+    border-radius: 999px;
+    background: var(--o-surface);
+    box-shadow: var(--o-shadow);
+    transition: transform var(--o-speed) ease;
+}
+
+.o-switch input:checked ~ .o-switch-track {
+    background: var(--o-accent);
+    border-color: var(--o-accent);
+}
+
+.o-switch input:checked ~ .o-switch-track .o-switch-thumb {
+    transform: translateX(21px);
+}
+
+.o-switch input:focus-visible ~ .o-switch-track {
+    outline: 2px solid var(--o-accent);
+    outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ rows */
+
+.o-searchbar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--o-2);
+    color: var(--o-dim);
+}
+
+.o-searchbar .o-icon-svg {
+    position: absolute;
+    left: var(--o-3);
+    pointer-events: none;
+}
+
+.o-search {
+    padding-left: calc(var(--o-4) + 20px);
+}
+
+.o-rows {
+    display: flex;
+    flex-direction: column;
+    background: var(--o-surface);
+    border: 1px solid var(--o-line);
+    border-radius: var(--o-radius);
+    overflow: hidden;
+}
+
+.o-row {
+    display: flex;
+    align-items: center;
+    gap: var(--o-2);
+    padding: var(--o-2) var(--o-3);
+    border-bottom: 1px solid var(--o-line);
+}
+
+.o-row:last-child {
+    border-bottom: 0;
+}
+
+.o-row.is-off .o-row-name {
+    color: var(--o-dim);
+}
+
+.o-row.is-dragging {
+    opacity: 0.5;
+}
+
+.o-row-main {
+    flex: 1;
+    min-height: var(--o-tap);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    border: 0;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+    padding: var(--o-1) 0;
+    /* A long skin name must not push the switch off a 390px screen. */
+    min-width: 0;
+}
+
+.o-row-title {
+    display: flex;
+    align-items: center;
+    gap: var(--o-2);
+}
+
+.o-row-name {
+    font-weight: 550;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.o-row-meta {
+    font-size: 13px;
+    color: var(--o-dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.o-row-tools {
+    display: flex;
+    align-items: center;
+    gap: var(--o-1);
+    flex: none;
+}
+
+.o-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--o-warn);
+    flex: none;
+}
+
+/* ------------------------------------------------------- source + errors */
+
+.o-source {
+    width: 100%;
+    min-height: 200px;
+    padding: var(--o-3);
+    border: 1px solid var(--o-line);
+    border-radius: var(--o-radius-sm);
+    background: var(--o-inset);
+    font-family: var(--o-mono);
+    font-size: 13px;
+    line-height: 1.5;
+    resize: vertical;
+    white-space: pre;
+    overflow-wrap: normal;
+    overflow-x: auto;
+}
+
+.o-errors {
+    display: flex;
+    flex-direction: column;
+    gap: var(--o-3);
+}
+
+.o-error {
+    border-left: 3px solid var(--o-danger);
+    padding-left: var(--o-3);
+}
+
+.o-error-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--o-2);
+    align-items: baseline;
+}
+
+.o-error-line,
+.o-error-field {
+    font-family: var(--o-mono);
+    font-size: 12px;
+    color: var(--o-danger);
+    font-weight: 600;
+}
+
+.o-error-message {
+    font-size: 14px;
+}
+
+.o-lines {
+    margin-top: var(--o-2);
+    font-family: var(--o-mono);
+    font-size: 12px;
+    background: var(--o-inset);
+    border-radius: var(--o-radius-sm);
+    padding: var(--o-2) 0;
+    overflow-x: auto;
+}
+
+.o-line {
+    padding: 0 var(--o-3);
+    white-space: pre;
+    color: var(--o-dim);
+}
+
+.o-line.is-error {
+    color: var(--o-text);
+    background: color-mix(in srgb, var(--o-danger) 18%, transparent);
+    cursor: pointer;
+}
+
+.o-warnings {
+    display: flex;
+    flex-direction: column;
+    gap: var(--o-1);
+}
+
+.o-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--o-2);
+    font-size: 14px;
+    color: var(--o-warn);
+}
+
+/* --------------------------------------------------------------- import */
+
+.o-panes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--o-4);
+}
+
+.o-pane {
+    background: var(--o-surface);
+    border: 1px solid var(--o-line);
+    border-radius: var(--o-radius);
+    padding: var(--o-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--o-3);
+}
+
+.o-pane-title {
+    font-size: 17px;
+    font-weight: 600;
+}
+
+.o-preview,
+.o-result {
+    border-radius: var(--o-radius-sm);
+    padding: var(--o-3);
+    background: var(--o-inset);
+    font-size: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--o-2);
+}
+
+.o-preview.is-bad,
+.o-result.is-bad {
+    background: color-mix(in srgb, var(--o-danger) 10%, transparent);
+}
+
+.o-result.is-ok {
+    background: color-mix(in srgb, var(--o-ok) 12%, transparent);
+}
+
+.o-result-head {
+    font-weight: 600;
+}
+
+.o-candidates {
+    font-family: var(--o-mono);
+    font-size: 12px;
+    color: var(--o-dim);
+    word-break: break-all;
+}
+
+/* ------------------------------------------------------------------ log */
+
+.o-logbar {
+    display: flex;
+    gap: var(--o-2);
+}
+
+.o-log {
+    display: flex;
+    flex-direction: column;
+    background: var(--o-surface);
+    border: 1px solid var(--o-line);
+    border-radius: var(--o-radius);
+    overflow: hidden;
+}
+
+.o-log-entry {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    gap: var(--o-2);
+    padding: var(--o-2) var(--o-3);
+    border-bottom: 1px solid var(--o-line);
+    font-size: 13px;
+    align-items: baseline;
+}
+
+.o-log-entry:last-child {
+    border-bottom: 0;
+}
+
+.o-log-time {
+    font-family: var(--o-mono);
+    color: var(--o-dim);
+}
+
+.o-log-skin {
+    color: var(--o-dim);
+    max-width: 8em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.o-log-message {
+    overflow-wrap: anywhere;
+}
+
+.o-log-entry.is-warn .o-log-message {
+    color: var(--o-warn);
+}
+
+.o-log-entry.is-error .o-log-message {
+    color: var(--o-danger);
+}
+
+/* --------------------------------------------------------------- popup */
+
+.o-popup {
+    display: flex;
+    flex-direction: column;
+    gap: var(--o-3);
+}
+
+.o-host {
+    font-size: 18px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.o-popup-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--o-2);
+}
+
+.o-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--o-2);
+    background: color-mix(in srgb, var(--o-warn) 16%, transparent);
+    border-radius: var(--o-radius-sm);
+    padding: var(--o-2) var(--o-3);
+    font-size: 14px;
+}
+
+.o-empty-line {
+    font-size: 15px;
+    color: var(--o-dim);
+}
+
+.o-others summary {
+    min-height: var(--o-tap);
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+    color: var(--o-dim);
+    cursor: pointer;
+}
+
+.o-rows.is-quiet .o-row-name {
+    font-weight: 400;
+}
+
+/* -------------------------------------------------------- vars + settings */
+
+.o-vars {
+    display: flex;
+    flex-direction: column;
+    gap: var(--o-3);
+}
+
+.o-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--o-1);
+}
+
+.o-field.is-inline {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--o-3);
+}
+
+.o-field-label {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.o-field-control {
+    display: flex;
+    align-items: center;
+    gap: var(--o-2);
+}
+
+.o-color {
+    width: var(--o-tap);
+    height: var(--o-tap);
+    padding: 2px;
+    border: 1px solid var(--o-line);
+    border-radius: var(--o-radius-sm);
+    background: var(--o-surface);
+    flex: none;
+}
+
+.o-color-text {
+    font-family: var(--o-mono);
+    font-size: 13px;
+}
+
+.o-range {
+    flex: 1;
+    min-height: var(--o-tap);
+    accent-color: var(--o-accent);
+}
+
+.o-readout,
+.o-units {
+    font-family: var(--o-mono);
+    font-size: 13px;
+    color: var(--o-dim);
+    min-width: 4ch;
+}
+
+.o-number {
+    max-width: 8em;
+}
+
+.o-reset {
+    border: 0;
+    background: none;
+    color: var(--o-accent);
+    font-size: 14px;
+    cursor: pointer;
+    min-height: var(--o-tap);
+    padding: 0;
+}
+
+.o-setting {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--o-3);
+    padding: var(--o-2) 0;
+    border-bottom: 1px solid var(--o-line);
+}
+
+.o-setting:last-of-type {
+    border-bottom: 0;
+}
+
+.o-setting-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.o-setting-label {
+    font-weight: 500;
+}
+
+.o-setting-note {
+    font-size: 13px;
+    color: var(--o-dim);
+}
+
+.o-setting-control {
+    flex: none;
+    max-width: 55%;
+}
+
+.o-caplist {
+    display: flex;
+    flex-direction: column;
+    gap: var(--o-2);
+}
+
+.o-cap {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border-left: 3px solid var(--o-ok);
+    padding-left: var(--o-3);
+}
+
+.o-cap.is-off {
+    border-left-color: var(--o-line);
+}
+
+.o-cap-label {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.o-cap-note {
+    font-size: 13px;
+    color: var(--o-dim);
+}
+
+/* ---------------------------------------------------------------- empty */
+
+.o-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: var(--o-2);
+    padding: var(--o-6) var(--o-4);
+    color: var(--o-dim);
+}
+
+.o-empty-title {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--o-text);
+}
+
+.o-empty-body {
+    font-size: 14px;
+    max-width: 34ch;
+}
+
+.o-back {
+    align-self: flex-start;
+    border: 0;
+    background: none;
+    color: var(--o-accent);
+    font-size: 15px;
+    cursor: pointer;
+    min-height: var(--o-tap);
+    padding: 0;
+}
+
+.o-back::before {
+    content: "‹ ";
+}
+
+/* ------------------------------------------------------------- desktop */
+
+@media (min-width: 720px) {
+    .o-tabbar {
+        position: sticky;
+        inset: 0 0 auto 0;
+        order: 1;
+        justify-content: center;
+        gap: var(--o-2);
+        border-top: 0;
+        border-bottom: 1px solid var(--o-line);
+    }
+
+    .o-tab {
+        flex: 0 0 auto;
+        min-width: 120px;
+        border-top: 0;
+        border-bottom: 2px solid transparent;
+    }
+
+    .o-tab.is-active {
+        border-bottom-color: var(--o-accent);
+    }
+
+    .o-main {
+        padding-bottom: var(--o-6);
+    }
+
+    .o-panes {
+        flex-direction: row;
+        align-items: flex-start;
+    }
+
+    .o-pane {
+        flex: 1 1 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * {
+        transition: none !important;
+        animation: none !important;
+    }
+}
