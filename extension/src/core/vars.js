@@ -326,7 +326,7 @@ export function coerceValue(v, value) {
         case "number":
         case "range": {
             const n = Number(value);
-            return clampNumber(v, Number.isFinite(n) ? n : Number(v.default));
+            return Number.isFinite(n) ? clampNumber(v, n) : v.default;
         }
         case "select":
         case "image": {
