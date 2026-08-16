@@ -4,9 +4,14 @@
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <title>Oriel</title>
-        <link rel="stylesheet" href="../ui/theme.css" />
+        <!-- Both stylesheets sit beside this file in the built bundle. A
+             relative path out of the directory would resolve outside the app
+             bundle's granted read access on iOS and silently load nothing. -->
+        <link rel="stylesheet" href="theme.css" />
         <link rel="stylesheet" href="chrome.css" />
-        <script type="module" src="chrome.js"></script>
+        <!-- Not type="module": WKWebView refuses ES modules over file://, and
+             the build emits an IIFE anyway. Deferred so the document exists. -->
+        <script defer src="chrome.js"></script>
     </head>
     <body class="o-body">
         <!-- chrome.js renders the whole interface into this node; see views.js. -->
