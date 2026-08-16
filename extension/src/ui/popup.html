@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <!-- viewport-fit=cover so the safe-area insets in theme.css are non-zero on an iPhone. -->
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <title>Oriel</title>
+        <link rel="stylesheet" href="theme.css" />
+        <!-- Deferred module, never inline: the extension CSP forbids inline script,
+             and the build emits a self-contained bundle at this same name. -->
+        <script type="module" src="popup.js"></script>
+    </head>
+    <body class="o-body o-body-popup">
+        <div id="app" class="o-app" role="main"></div>
+    </body>
+</html>

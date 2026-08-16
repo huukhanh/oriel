@@ -1,44 +1,92 @@
-name: Device test result
-description: Report what happened when you ran the app on a real iPhone
-labels: ["needs-device-check"]
+name: Device test report
+description: Results from running Oriel on a real iPhone, iPad or Mac
+title: "[device] "
+labels: ["device-report"]
 body:
   - type: markdown
     attributes:
       value: |
-        Results from [TESTING.md §4](https://github.com/huukhanh/oriel/blob/main/TESTING.md#4-the-media-features--what-to-actually-check)
-        — the media behaviour no simulator and no CI can check.
+        Nothing in this project's automated checks can touch Safari, so this
+        report is the only evidence that exists for that half. Partial answers
+        are worth filing — "I got as far as step 3 and it did nothing" is a
+        useful result, not a failed test.
+
   - type: input
     id: device
     attributes:
-      label: iPhone model and iOS version
-      placeholder: iPhone 14 Pro, iOS 18.5
+      label: Device and OS version
+      placeholder: iPhone 14, iOS 18.2
     validations:
       required: true
+
+  - type: input
+    id: build
+    attributes:
+      label: Which build
+      description: A commit SHA, a release tag, or "built from main in Xcode".
+    validations:
+      required: true
+
   - type: dropdown
-    id: which
+    id: enabled
     attributes:
-      label: Which test
+      label: Did the extension appear in Safari's settings, and could you enable it?
       options:
-        - "4.1 — page pauses itself when switching apps"
-        - "4.2 — Picture in Picture button"
-        - "4.3 — background audio with the screen locked"
-        - "3 — the two-minute smoke test"
-        - "Something else"
+        - Yes, straightforwardly
+        - Yes, but it was not where the instructions said
+        - It was listed but would not enable
+        - It never appeared
     validations:
       required: true
-  - type: textarea
-    id: what
+
+  - type: dropdown
+    id: js
     attributes:
-      label: What happened
+      label: What does Settings → Capabilities say about skin JavaScript?
       description: |
-        For §4.3 the **timing** is the useful part — "audio died at about 25
-        seconds" and "good for 8 minutes" have different causes and imply
-        different apps.
+        This is the single most valuable line in the report. Whether Safari lets
+        an extension run code it downloaded is currently unknown, and the answer
+        decides whether skins on iOS can use JavaScript at all.
+      options:
+        - "Runs in this extension's isolated world"
+        - "Runs in a dedicated user-script world"
+        - "Suspended — this browser does not allow it"
+        - The Capabilities panel did not load
     validations:
       required: true
-  - type: textarea
-    id: log
+
+  - type: dropdown
+    id: applied
     attributes:
-      label: Log contents
-      description: In the app, tap the lines button then **Copy**. Paste verbatim rather than summarised.
+      label: Did a skin actually change a page?
+      options:
+        - Yes, and it was styled before the page appeared
+        - Yes, but the page flashed unstyled first
+        - No
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: What you did, and what happened
+      description: |
+        Step by step, including the site you tried it on. If something looked
+        wrong, a screenshot is worth more than a description.
+    validations:
+      required: true
+
+  - type: textarea
+    id: usability
+    attributes:
+      label: Anything awkward to use one-handed?
+      description: |
+        Tap targets, the editor with the keyboard up, scrolling, reachability.
+        This is genuinely hard to get right blind and easy to fix once reported.
+
+  - type: textarea
+    id: errors
+    attributes:
+      label: Errors, verbatim
+      description: Xcode build errors, or lines from the extension's own log.
       render: text

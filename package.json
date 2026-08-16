@@ -1,0 +1,22 @@
+{
+  "name": "oriel",
+  "private": true,
+  "type": "module",
+  "description": "A browser extension that stores and applies skins — packages that completely change a website's UI and UX.",
+  "scripts": {
+    "test": "vitest run --config vitest.config.js",
+    "test:watch": "vitest --config vitest.config.js",
+    "test:e2e": "vitest run --config vitest.e2e.config.js",
+    "test:all": "pnpm test && pnpm test:e2e",
+    "lint": "node scripts/lint.mjs",
+    "build": "node scripts/build.mjs",
+    "check": "pnpm lint && pnpm test"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "jsdom": "^25.0.0",
+    "playwright": "^1.62.1",
+    "vitest": "^2.0.0"
+  },
+  "packageManager": "pnpm@11.18.0"
+}

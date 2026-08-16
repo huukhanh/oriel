@@ -1,0 +1,92 @@
+/* ==UserStyle==
+@name           Reader mode
+@namespace      github.com/huukhanh/oriel
+@version        1.0.0
+@description    A calm reading column for text-heavy sites — big type, a sane
+                 measure, and a few knobs for how it looks.
+@author         Oriel
+@license        MIT
+@homepageURL    https://github.com/huukhanh/oriel/tree/main/skins/reader
+@updateURL      https://raw.githubusercontent.com/huukhanh/oriel/main/skins/reader/reader.user.css
+@preprocessor   default
+@var range   width     "Column width"  [680, 480, 900, 20, "px"]
+@var range   size      "Text size"     [19, 15, 24, 1, "px"]
+@var color   ink       "Text colour"   #2a2a2a
+@var checkbox bold     "Bolder text"   0
+@var select  contrast  "Background" {
+  "Paper:paper": "#faf7f0",
+  "White:white": "#ffffff",
+  "Soft grey:grey": "#f1f1ee"
+}
+==/UserStyle== */
+
+/* Wikipedia's article body: kill the sidebar chrome, widen nothing else. */
+@-moz-document domain("wikipedia.org") {
+  :root {
+    --width: /*[[width]]*/;
+    --size: /*[[size]]*/;
+    --ink: /*[[ink]]*/;
+    --bg: /*[[contrast]]*/;
+  }
+
+  body { background: var(--bg); }
+
+  #content, #bodyContent, .mw-parser-output {
+    max-width: var(--width);
+    margin: 0 auto;
+    font-size: var(--size);
+    line-height: 1.6;
+    color: var(--ink);
+    /* --bold comes straight from the checkbox var's own auto-generated
+       custom property (a bare 0/1, no units) — no placeholder needed. */
+    font-weight: calc(400 + var(--bold, 0) * 300);
+  }
+
+  #mw-panel, #mw-head, .vector-menu-tabs, .vector-page-toolbar, .navbox { display: none; }
+}
+
+/* A generic long-form article body. Anything with an <article> element gets
+   the same column, on any domain — this section's rule is separate from the
+   one above because a skin's include set has no way to say "this domain OR
+   this selector", and a section is the unit that carries one rule. */
+@-moz-document regexp("^https://.*/(blog|posts?|articles?)/.*") {
+  :root {
+    --width: /*[[width]]*/;
+    --size: /*[[size]]*/;
+    --ink: /*[[ink]]*/;
+    --bg: /*[[contrast]]*/;
+  }
+
+  html { background: var(--bg); }
+
+  article, main, .post, .article {
+    max-width: var(--width);
+    margin: 2rem auto;
+    font-size: var(--size);
+    line-height: 1.65;
+    color: var(--ink);
+  }
+
+  aside, .sidebar, .related-posts, .comments, .newsletter-signup { display: none; }
+}
+
+/* Anywhere else the author wants it — this section only applies when a
+   match is given explicitly, so it never fights a site it wasn't tuned for. */
+@-moz-document url-prefix("https://example.com/reading-list/") {
+  :root {
+    --width: /*[[width]]*/;
+    --size: /*[[size]]*/;
+    --ink: /*[[ink]]*/;
+    --bg: /*[[contrast]]*/;
+  }
+
+  .entry-content {
+    max-width: var(--width);
+    font-size: var(--size);
+    line-height: 1.6;
+    color: var(--ink);
+    background: var(--bg);
+    padding: 2rem;
+    border-radius: 12px;
+  }
+}

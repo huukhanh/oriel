@@ -1,0 +1,37 @@
+{
+  "$schema": "https://oriel.dev/schema/skin-1.json",
+  "format": 1,
+  "id": "hn-rebuilt",
+  "name": "Hacker News, rebuilt",
+  "version": "1.0.0",
+  "description": "Card layout, real typography, no table soup.",
+  "author": "Oriel",
+  "license": "MIT",
+  "homepageURL": "https://github.com/huukhanh/oriel/tree/main/skins/hn-rebuilt",
+  "updateURL": "https://raw.githubusercontent.com/huukhanh/oriel/main/skins/hn-rebuilt/skin.json",
+  "matches": ["*://news.ycombinator.com/*"],
+  "excludes": ["*://news.ycombinator.com/login*", "*://news.ycombinator.com/submit*"],
+  "runAt": "document_start",
+  "css": ["style.css"],
+  "dom": "layout.dom.json",
+  "vars": [
+    { "key": "accent", "type": "color", "label": "Accent", "default": "#ff6600" },
+    { "key": "density", "type": "range", "label": "Row spacing", "default": 14, "min": 8, "max": 28, "step": 2, "units": "px" },
+    {
+      "key": "corners", "type": "select", "label": "Corner style", "default": "rounded",
+      "options": [
+        { "key": "sharp", "label": "Sharp", "value": "0px" },
+        { "key": "rounded", "label": "Rounded", "value": "10px" },
+        { "key": "pill", "label": "Pill", "value": "999px" }
+      ]
+    },
+    { "key": "showRank", "type": "checkbox", "label": "Show rank number", "default": 1 },
+    {
+      "key": "measure", "type": "select", "label": "Reading width", "default": "comfortable",
+      "options": [
+        { "key": "comfortable", "label": "Comfortable", "value": "720px" },
+        { "key": "wide", "label": "Wide", "value": "960px" }
+      ]
+    }
+  ]
+}

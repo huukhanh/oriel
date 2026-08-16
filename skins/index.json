@@ -1,0 +1,32 @@
+[
+  {
+    "id": "hn-rebuilt",
+    "name": "Hacker News, rebuilt",
+    "description": "Card layout, real typography, no table soup.",
+    "author": "Oriel",
+    "path": "skins/hn-rebuilt/skin.json",
+    "install": "https://raw.githubusercontent.com/huukhanh/oriel/main/skins/hn-rebuilt/skin.json",
+    "matches": ["*://news.ycombinator.com/*"],
+    "tags": ["redesign", "dom-ops", "dark-mode"]
+  },
+  {
+    "id": "reader",
+    "name": "Reader mode",
+    "description": "A calm reading column for text-heavy sites — big type, a sane measure, a few knobs.",
+    "author": "Oriel",
+    "path": "skins/reader/reader.user.css",
+    "install": "https://raw.githubusercontent.com/huukhanh/oriel/main/skins/reader/reader.user.css",
+    "matches": ["*://*.wikipedia.org/*"],
+    "tags": ["usercss", "reading", "typography"]
+  },
+  {
+    "id": "dim",
+    "name": "Dim everything",
+    "description": "Dims any page. The whole format in one small file — start here if you're new.",
+    "author": "Oriel",
+    "path": "skins/dim/dim.user.css",
+    "install": "https://raw.githubusercontent.com/huukhanh/oriel/main/skins/dim/dim.user.css",
+    "matches": ["<all_urls>"],
+    "tags": ["usercss", "beginner", "everywhere"]
+  }
+]

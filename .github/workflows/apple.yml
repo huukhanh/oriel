@@ -1,0 +1,92 @@
+# Builds the Safari Web Extension container app for iOS.
+#
+# Manual and tag-only, not on every push. macOS runners bill at ten times the
+# rate of Linux ones, and this job proves one thing — that the Swift compiles
+# and the app packages — which changes far less often than the extension does.
+# Everything about Oriel's actual behaviour is covered by ci.yml on Linux.
+#
+# The build is unsigned on purpose. No Apple certificate belongs in this
+# repository; the artifact is signed by whoever installs it, with their own
+# Apple ID. See docs/SAFARI.md.
+name: apple
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # No version pin here: package.json's "packageManager" field is the one
+      # source of truth, and giving the action a second one is a hard error.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "24", cache: pnpm }
+
+      # The extension has to exist before Xcode can copy it into the .appex.
+      # If this is skipped the build fails in the copy phase with a message
+      # saying exactly that, which is the point of checking there too.
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build --target safari
+      - run: test -f dist/safari/manifest.json
+
+      - run: brew install xcodegen
+      - run: xcodegen generate
+        working-directory: apple
+
+      - name: Build
+        working-directory: apple
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Oriel.xcodeproj \
+            -scheme Oriel \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      # The app and its embedded extension have to agree, and a .appex that
+      # lost its manifest is an extension that installs and then does nothing —
+      # a failure that is invisible until someone has sideloaded it onto a
+      # phone. Cheaper to catch here.
+      - name: Check the extension made it into the bundle
+        working-directory: apple
+        run: |
+          APP="build/Build/Products/Release-iphoneos/Oriel.app"
+          APPEX="${APP}/PlugIns/Oriel Extension.appex"
+          test -d "${APPEX}" || { echo "no extension in the app bundle"; exit 1; }
+          test -f "${APPEX}/manifest.json" || { echo "no manifest.json in the extension"; exit 1; }
+          test -f "${APPEX}/background.js" || { echo "no background.js in the extension"; exit 1; }
+          test -f "${APPEX}/content.js" || { echo "no content.js in the extension"; exit 1; }
+          test -f "${APPEX}/manager.html" || { echo "no manager.html in the extension"; exit 1; }
+          echo "extension bundle contents:"
+          ls -1 "${APPEX}"
+
+      - name: Package an unsigned .ipa
+        working-directory: apple
+        run: |
+          mkdir -p out/Payload
+          cp -R "build/Build/Products/Release-iphoneos/Oriel.app" out/Payload/
+          cd out && zip -qry Oriel-unsigned.ipa Payload
+          unzip -l Oriel-unsigned.ipa | tail -5
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Oriel-unsigned-ipa
+          path: apple/out/Oriel-unsigned.ipa
+          retention-days: 30
+
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${GITHUB_REF_NAME}" apple/out/Oriel-unsigned.ipa --clobber

@@ -1,8 +1,5 @@
-.DS_Store
-.build/
 node_modules/
-DerivedData/
-*.xcuserstate
-xcuserdata/
-*.xcodeproj/
-.oriel-local
+dist/
+.DS_Store
+test-results/
+*.log

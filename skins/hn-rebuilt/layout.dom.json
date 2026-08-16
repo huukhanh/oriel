@@ -1,0 +1,26 @@
+[
+  { "op": "unwrap", "select": "body > center, #hnmain, #hnmain > tbody, table.itemlist, table.itemlist > tbody" },
+
+  { "op": "remove", "select": "#pagespace, tr.spacer, tr.morespace" },
+
+  { "op": "wrap", "select": "tr.athing", "with": { "tag": "div", "class": "story" } },
+
+  {
+    "op": "setAttr",
+    "select": ".story",
+    "attr": "data-rank",
+    "from": { "select": ".rank", "pattern": "(\\d+)" },
+    "value": "$1"
+  },
+  { "op": "attrToVar", "select": ".story", "attr": "data-rank", "var": "rank" },
+
+  {
+    "op": "rewriteText",
+    "select": "td.subtext a[href^=\"item?id=\"]",
+    "pattern": "^(\\d+)\\s+comments?$",
+    "flags": "i",
+    "with": "💬 $1"
+  },
+
+  { "op": "move", "select": "a.morelink", "into": "body", "position": "append" }
+]
