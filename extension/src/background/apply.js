@@ -129,17 +129,39 @@ export async function removeCss(tabId, frameId, css) {
  * exists. Where it does not — Safari, as far as we can tell — the content
  * script path covers it and this never runs.
  */
+/**
+ * There used to be an early CSS push here, on `webNavigation.onCommitted`, to
+ * beat the content script's first message by a paint. It is gone, and the
+ * reason is worth keeping.
+ *
+ * `removeCSS` matches on the exact text that was inserted. The early push sent
+ * one concatenated stylesheet and the content script sends one per sheet, so
+ * nothing could ever remove what the early push had inserted — a skin came off
+ * the page's attribute list on a single-page route change but stayed on the
+ * page. Making the two paths agree would mean the background tracking what it
+ * pushed per frame and reconciling it against what the content script did.
+ *
+ * That is real complexity for an optimisation that cannot help where it
+ * matters: Safari, the platform this product is aimed at, has no
+ * `webNavigation` at all, so the early push never ran there. It bought nothing
+ * on the target and broke teardown everywhere else.
+ */
 export function watchNavigation() {
     if (!has("webNavigation", "onCommitted")) return false;
 
-    api.webNavigation.onCommitted.addListener(async (details) => {
-        if (!isSkinnable(details.url)) return;
-        const { skins } = await skinsForUrl(details.url, { topFrame: details.frameId === 0 });
-        for (const skin of skins) {
-            const sheets = [skin.varBlock, ...skin.css.map((sheet) => sheet.text)].filter(Boolean);
-            if (sheets.length) await insertCss(details.tabId, details.frameId, sheets.join("\n"));
-        }
-    });
+    // A single-page app changing route. The content script cannot see the
+    // page's own `pushState` — separate worlds — so this is the fast path for
+    // telling it, and its poll is the slow one. See content/main.js.
+    if (has("webNavigation", "onHistoryStateUpdated")) {
+        api.webNavigation.onHistoryStateUpdated.addListener(async (details) => {
+            if (!isSkinnable(details.url) || details.tabId === undefined) return;
+            try {
+                await call(api.tabs, "sendMessage", details.tabId, { type: "event.changed", reason: "navigate" });
+            } catch {
+                // No content script in that frame yet. The poll will catch up.
+            }
+        });
+    }
     return true;
 }
 

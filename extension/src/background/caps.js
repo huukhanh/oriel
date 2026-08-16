@@ -129,8 +129,8 @@ export function explain(c) {
     lines.push({
         level: "info",
         text: c.webNavigation
-            ? "Stylesheets are pushed as navigation commits, before the page paints."
-            : "Stylesheets are applied on first contact from the page; a very slow page may flash unstyled."
+            ? "Single-page route changes are reported by the browser, so skins swap over immediately."
+            : "Single-page route changes are noticed by polling, so a skin may take a moment to swap over."
     });
     return lines;
 }

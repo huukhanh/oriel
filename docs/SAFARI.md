@@ -78,9 +78,15 @@ downloaded. Whether Safari does is
 can report back.
 
 **A skin applies, but the page flashes unstyled first.** Worth reporting with
-the site name. Oriel injects at `document_start`, but on Safari it cannot push
-stylesheets at navigation-commit time the way it can elsewhere, so a slow page
-has a window where this is possible.
+the site name and roughly how long the flash lasts. Oriel injects at
+`document_start`, which should be before first paint, but that has never been
+measured on Safari and the margin on a slow connection is unknown.
+
+**A skin takes a second to swap over when you click inside a single-page app.**
+Expected on Safari. A browser extension cannot see a page's own `history`
+calls — they happen in a different JavaScript world — so where the browser does
+not report route changes itself, Oriel polls a few times a second. Report it if
+it is slower than about half a second.
 
 **Everything worked and now the app will not open.** Seven days passed. Re-sign.
 

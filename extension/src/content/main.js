@@ -212,17 +212,28 @@ function report(skinId, level, message) {
 // --- single-page apps ------------------------------------------------------
 
 /**
- * Patched once, here, rather than once per skin. Ten skins each wrapping
- * `pushState` produces ten nested wrappers and ten re-entrant re-evaluations
- * for one route change; this is the bug that shape of code always has.
+ * Noticing that a single-page app changed route.
+ *
+ * The obvious approach — wrap `history.pushState` — does not work from a
+ * content script, and the way it fails is quiet. A content script runs in an
+ * isolated world with its own global scope, so the `pushState` it replaces is
+ * not the one the page calls. Measured in Chromium: the patch installs, the
+ * page navigates, and nothing fires. Any implementation that only does this
+ * looks right and silently never tears a skin down.
+ *
+ * So there are three sources, and the first one to notice wins:
+ *
+ *   1. `popstate` and `hashchange`, which are real events and cross worlds.
+ *   2. The background, via `webNavigation.onHistoryStateUpdated` — instant and
+ *      free where it exists. Safari's support is unverified.
+ *   3. A poll. Unfashionable, and the only thing guaranteed to work everywhere;
+ *      one string comparison every 300ms is not a cost worth optimising away
+ *      when the alternative is a skin that will not come off.
+ *
+ * The `history` patch is kept anyway, because it does work for the one caller
+ * that shares this world: a skin's own JavaScript.
  */
 function watchNavigation() {
-    const announce = () => {
-        if (location.href === currentUrl) return;
-        currentUrl = location.href;
-        queueMicrotask(reevaluate);
-    };
-
     for (const name of ["pushState", "replaceState"]) {
         const original = history[name];
         if (typeof original !== "function") continue;
@@ -232,8 +243,19 @@ function watchNavigation() {
             return result;
         };
     }
+
     addEventListener("popstate", announce);
     addEventListener("hashchange", announce);
+
+    // Deliberately not cleared: a page that has no skins now may match after
+    // the next route change, so there is nothing to stop polling for.
+    setInterval(announce, 300);
+}
+
+function announce() {
+    if (location.href === currentUrl) return;
+    currentUrl = location.href;
+    queueMicrotask(reevaluate);
 }
 
 async function reevaluate() {
