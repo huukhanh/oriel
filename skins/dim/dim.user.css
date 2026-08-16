@@ -1,0 +1,40 @@
+/* ==UserStyle==
+@name           Dim everything
+@namespace      github.com/huukhanh/oriel
+@version        1.0.1
+@description    Dims any page. The whole format in one small file — start here.
+@author         Oriel
+@license        MIT
+@homepageURL    https://github.com/huukhanh/oriel/tree/main/skins/dim
+@updateURL      https://raw.githubusercontent.com/huukhanh/oriel/main/skins/dim/dim.user.css
+@preprocessor   default
+@var range   amount   "Dim amount"    [35, 0, 80, 5]
+@var checkbox warm    "Warm tint"     0
+==/UserStyle== */
+
+/* regexp(".*") matches every URL — the one rule kind that can, which is why
+   it's what a skin meant to run everywhere reaches for. */
+@-moz-document regexp(".*") {
+  /* Oriel declares --amount and --warm on :root for you, from the @var block
+     above. There is nothing to write here to make them exist.
+
+     `amount` is declared with no units, so it arrives as a bare number and can
+     go into arithmetic. Give a range var units — [35, 0, 80, 5, "%"] — and the
+     value arrives as `35%`, which is what you want for a width and useless
+     inside calc() for an alpha. That choice is the whole trick to reading this
+     file. */
+  html::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2147483647;
+    background: black;
+    opacity: calc(var(--amount, 35) / 100);
+  }
+
+  /* A checkbox is 0 or 1, which is already a perfectly good filter amount. */
+  html {
+    filter: sepia(calc(var(--warm, 0) * 0.25));
+  }
+}

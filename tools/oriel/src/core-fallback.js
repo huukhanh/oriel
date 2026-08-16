@@ -205,42 +205,46 @@ export function validateOps(ops) {
 
 // ---- vars ----------------------------------------------------------------
 
-/** @returns {{vars: object[], errors: {message:string, field:string}[]}} */
+/**
+ * Field paths are `vars[i]` with the path folded into the message text too —
+ * matching `extension/src/core/vars.js`'s convention, so callers don't need
+ * to know which one produced an error. Unlike that module, this one does not
+ * validate a default against its own min/max/options — see
+ * `oriel-cli/src/skin-loader.js`'s `checkVarBounds`, which does that as a
+ * layer on top of *either* implementation.
+ *
+ * @returns {{vars: object[], errors: {message:string, field:string}[]}}
+ */
 export function normalizeVars(rawVars) {
     const errors = [];
     const seen = new Set();
-    const vars = (rawVars ?? []).map((v, i) => {
-        const field = `[${i}]`;
+    const list = Array.isArray(rawVars) ? rawVars : rawVars == null ? [] : [rawVars];
+    const vars = [];
+    list.forEach((v, i) => {
+        const field = `vars[${i}]`;
         if (!v || typeof v !== "object") {
-            errors.push({ message: "var must be an object", field });
-            return v;
+            errors.push({ message: `${field}: a var must be an object`, field });
+            return;
         }
-        if (!v.key) {
-            errors.push({ message: "var is missing \"key\"", field: `${field}.key` });
-        } else if (seen.has(v.key)) {
-            errors.push({ message: `duplicate var key "${v.key}"`, field: `${field}.key` });
-        } else {
-            seen.add(v.key);
+        const key = typeof v.key === "string" ? v.key.trim() : "";
+        if (!/^[\w-]+$/.test(key)) {
+            errors.push({ message: `${field}: missing or invalid "key"`, field });
+            return;
+        }
+        if (seen.has(key)) {
+            errors.push({ message: `${field}: duplicate var key "${key}"`, field });
+            return;
         }
         if (!VAR_TYPES.includes(v.type)) {
-            errors.push({ message: `unknown var type "${v.type}"`, field: `${field}.type` });
-            return v;
+            errors.push({ message: `${field}: unknown var type "${v.type}"`, field });
+            return;
         }
-        if (v.type === "number" || v.type === "range") {
-            const def = Number(v.default);
-            if (v.min !== undefined && def < v.min) {
-                errors.push({ message: `default ${v.default} is below min ${v.min}`, field: `${field}.default` });
-            }
-            if (v.max !== undefined && def > v.max) {
-                errors.push({ message: `default ${v.default} is above max ${v.max}`, field: `${field}.default` });
-            }
+        if (v.default === undefined || v.default === null) {
+            errors.push({ message: `${field}: var "${key}" needs a default`, field });
+            return;
         }
-        if ((v.type === "select" || v.type === "image") && Array.isArray(v.options) && v.options.length > 0) {
-            if (!v.options.some((o) => o.key === v.default)) {
-                errors.push({ message: `default "${v.default}" is not one of the declared options`, field: `${field}.default` });
-            }
-        }
-        return v;
+        seen.add(key);
+        vars.push({ ...v, key });
     });
     return { vars, errors };
 }
@@ -254,9 +258,17 @@ export function defaultValues(vars) {
 }
 
 // ---- usercss ---------------------------------------------------------
+//
+// Shape matches extension/src/core/usercss.js's parseUserCss exactly —
+// {meta, name, version, ..., vars, sections: [{rules, css}], targets,
+// dom, js, runAt, allFrames, warnings, errors} — so skin-loader.js has one
+// contract regardless of which produced it. This is a reduced parser:
+// @oriel-dom/@oriel-js/@oriel-match/@oriel-exclude are not supported here
+// (dom/js/targets.include/exclude always come back empty) — the real module
+// is what should be relied on for those; this is the last-resort fallback.
 
 export function isUserCss(text) {
-    return /==UserStyle==/.test(text);
+    return typeof text === "string" && /\/\*\s*==UserStyle==/.test(text);
 }
 
 function stripQuotes(s) {
@@ -283,34 +295,33 @@ function parseOptionMap(spec) {
     });
 }
 
-function parseVarLine(body, line) {
+/** Throws on a malformed line — the caller turns that into an `errors` entry, never a thrown exception. */
+function parseVarLine(body) {
     const m = /^(\S+)\s+(\S+)\s+"((?:[^"\\]|\\.)*)"\s+([\s\S]+)$/.exec(body.trim());
-    if (!m) throw new Error(`cannot parse "${body.trim()}"`);
+    if (!m) throw new Error(`cannot parse "@var ${body.trim()}"`);
     const [, type, key, label, defSpecRaw] = m;
     const spec = defSpecRaw.trim();
-    if (!VAR_TYPES.includes(type)) {
-        return { key, type, label, default: stripQuotes(spec), line };
-    }
+    if (!VAR_TYPES.includes(type)) throw new Error(`@var has an unknown type "${type}"`);
     switch (type) {
         case "text":
-            return { key, type, label, default: stripQuotes(spec), line };
+            return { key, type, label, default: stripQuotes(spec) };
         case "color":
-            return { key, type, label, default: spec, line };
+            return { key, type, label, default: spec };
         case "checkbox":
-            return { key, type, label, default: spec === "1" ? 1 : 0, line };
+            return { key, type, label, default: spec === "1" ? 1 : 0 };
         case "number":
         case "range": {
             const tuple = JSON.parse(spec);
             const [def, min, max, step, units] = tuple;
-            return { key, type, label, default: Number(def), min: Number(min), max: Number(max), step: Number(step), units: units !== undefined ? String(units) : undefined, line };
+            return { key, type, label, default: Number(def), min: Number(min), max: Number(max), step: Number(step), units: units !== undefined ? String(units) : undefined };
         }
         case "select":
         case "image": {
             const options = parseOptionMap(spec);
-            return { key, type, label, default: options[0] ? options[0].key : "", options, line };
+            return { key, type, label, default: options[0] ? options[0].key : "", options };
         }
         default:
-            return { key, type, label, default: stripQuotes(spec), line };
+            return { key, type, label, default: stripQuotes(spec) };
     }
 }
 
@@ -335,11 +346,11 @@ function splitTopLevel(s, sep) {
     return out;
 }
 
-function parseDocFunctions(raw, line) {
+/** One entry per function; a part that doesn't parse becomes `null` rather than aborting the whole list. */
+function parseDocFunctions(raw) {
     return splitTopLevel(raw, ",").map((part) => {
         const m = /^(domain|regexp|url-prefix|url)\(\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')\s*\)$/.exec(part.trim());
-        if (!m) throw new SkinParseError(`cannot parse @-moz-document function "${part.trim()}"`, { line });
-        return { kind: m[1], value: stripQuotes(m[2]) };
+        return m ? { kind: m[1], value: stripQuotes(m[2]) } : null;
     });
 }
 
@@ -365,7 +376,8 @@ function findMatchingBrace(text, openIndex) {
     return -1;
 }
 
-function parseSections(text, fromIndex) {
+/** `{sections, errors}` — a block that never closes stops the scan but still returns what came before it. */
+function parseSections(text, fromIndex, errors) {
     const sections = [];
     const re = /@-moz-document\s+([^{]+)\{/g;
     re.lastIndex = fromIndex;
@@ -374,27 +386,58 @@ function parseSections(text, fromIndex) {
         const line = lineAtLocal(text, m.index);
         const bodyStart = re.lastIndex;
         const bodyEnd = findMatchingBrace(text, bodyStart - 1);
-        if (bodyEnd === -1) throw new SkinParseError("unterminated @-moz-document block", { line });
-        const rules = parseDocFunctions(m[1].trim(), line);
-        sections.push({ targets: { include: rules, exclude: [] }, css: text.slice(bodyStart, bodyEnd), cssStart: bodyStart, line });
+        if (bodyEnd === -1) {
+            errors.push({ message: "@-moz-document section opened here was never closed", line });
+            break;
+        }
+        const parsedFns = parseDocFunctions(m[1].trim());
+        for (const fn of parsedFns) {
+            if (!fn) errors.push({ message: `cannot parse @-moz-document function in "${m[1].trim()}"`, line });
+        }
+        sections.push({ rules: parsedFns.filter(Boolean), css: text.slice(bodyStart, bodyEnd) });
         re.lastIndex = bodyEnd + 1;
     }
     return sections;
 }
 
+function emptyResult(warnings, errors) {
+    return {
+        meta: {}, name: "", version: "0.0.0", namespace: "", description: "", author: "", license: "",
+        homepageURL: "", supportURL: "", updateURL: "", vars: [], sections: [],
+        targets: { include: [], exclude: [] }, dom: [], js: [], runAt: undefined, allFrames: false,
+        warnings, errors
+    };
+}
+
 /**
- * @returns {{meta: object, vars: object[], matchRule: object|null, sections: object[], warnings: string[]}}
+ * Never throws — a parse problem is an entry in `errors`, with a line number
+ * where one is known. Shape matches `extension/src/core/usercss.js`'s
+ * `parseUserCss` (see the module comment above); `@oriel-match`,
+ * `@oriel-exclude`, `@oriel-dom` and `@oriel-js` are not implemented here, so
+ * `targets.include/exclude` and `dom`/`js` always come back empty.
+ *
+ * @returns {{meta: object, name: string, version: string, namespace: string,
+ *   description: string, author: string, license: string, homepageURL: string,
+ *   supportURL: string, updateURL: string, vars: object[],
+ *   sections: {rules: object[], css: string}[], targets: object,
+ *   dom: object[], js: object[], runAt: string|undefined, allFrames: boolean,
+ *   warnings: string[], errors: {message: string, line?: number, field?: string}[]}}
  */
 export function parseUserCss(text) {
-    const headerMatch = /\/\*\s*==UserStyle==\s*\n([\s\S]*?)\n\s*==\/UserStyle==\s*\*\//.exec(text);
-    if (!headerMatch) throw new SkinParseError("no ==UserStyle== metadata block found", { line: 1 });
+    const warnings = [];
+    const errors = [];
+    const raw = typeof text === "string" ? text : "";
 
-    const headerBodyStartLine = lineAtLocal(text, headerMatch.index) + 1;
+    const headerMatch = /\/\*\s*==UserStyle==\s*\n([\s\S]*?)\n\s*==\/UserStyle==\s*\*\//.exec(raw);
+    if (!headerMatch) {
+        errors.push({ message: "no /* ==UserStyle== metadata block found", line: 1 });
+        return emptyResult(warnings, errors);
+    }
+
+    const headerBodyStartLine = lineAtLocal(raw, headerMatch.index) + 1;
     const lines = headerMatch[1].split("\n");
     const meta = {};
     const vars = [];
-    let matchRule = null;
-    const warnings = [];
 
     for (let li = 0; li < lines.length; li++) {
         const trimmed = lines[li].trim();
@@ -402,7 +445,7 @@ export function parseUserCss(text) {
         const line = headerBodyStartLine + li;
         const sp = trimmed.indexOf(" ");
         const key = sp === -1 ? trimmed.slice(1) : trimmed.slice(1, sp);
-        let rest = sp === -1 ? "" : trimmed.slice(sp + 1).trim();
+        const rest = sp === -1 ? "" : trimmed.slice(sp + 1).trim();
         if (key === "var") {
             let block = rest;
             while (countChar(block, "{") > countChar(block, "}") && li + 1 < lines.length) {
@@ -410,23 +453,47 @@ export function parseUserCss(text) {
                 block += "\n" + lines[li];
             }
             try {
-                vars.push(parseVarLine(block, line));
+                vars.push(parseVarLine(block));
             } catch (err) {
-                throw new SkinParseError(`bad @var: ${err.message}`, { line });
+                errors.push({ message: err.message, line, field: "vars" });
             }
             continue;
         }
-        if (key === "match") {
-            matchRule = { kind: "match", value: stripQuotes(rest) };
-            continue;
-        }
+        if (Object.hasOwn(meta, key)) warnings.push(`line ${line}: @${key} repeated; using the last value`);
         meta[key] = stripQuotes(rest);
     }
 
+    if (!meta.name || !meta.name.trim()) {
+        errors.push({ message: "missing @name", line: headerBodyStartLine, field: "name" });
+    }
+    if (meta.namespace === undefined) warnings.push("missing @namespace");
+    const version = meta.version === undefined ? (warnings.push("missing @version; defaulting to 0.0.0"), "0.0.0") : meta.version;
+
     if (meta.preprocessor === "less" || meta.preprocessor === "stylus") {
-        warnings.push(`@preprocessor ${meta.preprocessor} is not supported; variables are handled as "default"`);
+        warnings.push(`@preprocessor ${meta.preprocessor} is not supported; its @myVar / bare-name variable syntax is not resolved`);
     }
 
-    const sections = parseSections(text, headerMatch.index + headerMatch[0].length);
-    return { meta, vars, matchRule, sections, warnings };
+    const sections = parseSections(raw, headerMatch.index + headerMatch[0].length, errors);
+
+    return {
+        meta,
+        name: meta.name ?? "",
+        version,
+        namespace: meta.namespace ?? "",
+        description: meta.description ?? "",
+        author: meta.author ?? "",
+        license: meta.license ?? "",
+        homepageURL: meta.homepageURL ?? "",
+        supportURL: meta.supportURL ?? "",
+        updateURL: meta.updateURL ?? "",
+        vars,
+        sections,
+        targets: { include: [], exclude: [] },
+        dom: [],
+        js: [],
+        runAt: undefined,
+        allFrames: false,
+        warnings,
+        errors
+    };
 }
