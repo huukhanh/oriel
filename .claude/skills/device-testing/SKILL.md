@@ -1,69 +1,75 @@
 ---
 name: device-testing
-description: Writing the manual test instructions the user runs on their Mac, simulator, and real iPhone — including the build recipe, what the simulator can and cannot prove, per-PR test plans, and how to ask for useful failure reports. Use this skill whenever preparing a PR that contains platform code, when the user asks how to test something, when creating or updating TESTING.md, or when a reported failure needs narrowing down. Trigger it before handing any work back to the user for verification — an untestable handoff wastes their build cycle.
+description: Writing the device test the user actually runs on their iPhone — how to get them a build, what is worth asking, and how to get a useful answer back. Use this whenever preparing work that changes behaviour on Safari, when the user asks how to test something, or before handing anything back for verification. Trigger it before any device handoff — an untestable handoff wastes the one resource this project cannot buy more of.
 ---
 
-# Device testing handoff
+# Asking someone to test on a phone
 
-The user is the only instrument. A test plan they can't follow without thinking is a wasted round trip, and rounds are the scarce resource.
+The user has an iPhone and limited patience. Every question costs them
+attention, and a badly framed one costs them an afternoon and returns nothing.
 
-## TESTING.md
+## First: does this need a device at all?
 
-Lives at the repo root, maintained by you, appended to as features land. Structure:
+Usually not. Before writing a test plan, check whether the question can be
+answered by:
 
-1. **Setup** — Xcode version, clone, `xcodegen generate` if used, signing team, bundle id, which capabilities must be on (Background Modes → Audio, AirPlay, and PiP). Signing and capabilities are where first-time builds die; be specific.
-2. **Build recipes** — simulator and device, both from Xcode and from the command line (`xcodebuild -scheme App -destination 'platform=iOS Simulator,name=iPhone 16'`). CLI recipes let the user paste output back verbatim.
-3. **Smoke test** — the five steps that prove the app isn't fundamentally broken. Runs after every merge to `main`, takes under two minutes.
-4. **Feature suites** — one section per subsystem, grown as features land. Each numbered, each with an explicit expected result.
-5. **Known-broken** — things currently failing, with issue links, so the user doesn't re-report them.
+- a unit test (all of `core/`, and anything taking its DOM as an argument);
+- the Chromium e2e suite (manifest, service worker, content script, protocol);
+- the WebKit e2e suite (the HTML parser, the URL parser, CSP, timing).
 
-## Simulator vs. real device
+A device test is for what is *structurally* unknowable here: Safari's own
+extension host, iOS's permission flow, and whether anything is usable with a
+thumb. If the answer would not change a design decision, it is not worth a
+build cycle.
 
-Getting this wrong burns the user's time on tests that cannot succeed.
+## Getting them a build
 
-**Simulator is sufficient for**: navigation, layout, the script list and editor, storage and migrations, `@match` behavior against real sites, console/log view, import/export, settings persistence, the config-rebuild-and-restore path.
+Two routes; offer the easy one first.
 
-**Real device required for**: anything about Picture-in-Picture, background audio, screen-lock behavior, the Now Playing lock-screen controls, AirPlay, route changes (headphones in/out), interruptions (phone call), idle-timer behavior, and real-world performance on large pages. Simulator media behavior does not reflect the device and a simulator pass here means nothing.
+**Prebuilt.** The `apple` workflow (manual, and on `v*` tags) produces an
+unsigned `.ipa` as an artifact. Link the run directly. They sign it with their
+own Apple ID via SideStore / AltStore / Sideloadly, then trust the certificate
+in Settings → General → VPN & Device Management. A free Apple ID signature lasts
+**seven days**; say so, and say that skins survive re-signing.
 
-Label every test step with which one it needs. When a whole plan needs hardware, say so in the first line so the user doesn't start in the simulator.
+**From source.** Needed when you want real Xcode error messages:
 
-## Writing a plan
-
-Each step: an action, an expected result, and — where it's genuinely ambiguous — how to tell pass from fail. Prefer observations that don't require judgement.
-
-Good:
-```
-3. With the video playing, lock the screen. Wait 60 seconds.
-   Expect: audio continues without a gap; lock screen shows title and artwork
-           with working play/pause.
-   Fail signals: audio stops immediately (session config), stops after ~30s
-           (media process suspension — note the exact timing, it distinguishes
-           the two causes), or lock screen shows no controls (Now Playing not
-           populated).
+```sh
+pnpm install && pnpm build
+cd apple && xcodegen generate && open Oriel.xcodeproj
 ```
 
-Weak: "check that background playback works."
+Signing team must be set on **both** targets. If the Swift has changed since the
+last green `apple` run, say so and ask for the **first** error only — Swift
+cascades are noise after it.
 
-Naming the fail modes matters more here than on a normal project: the user's report is the only diagnostic signal available, and "it didn't work" is not actionable, while "it played for about 25 seconds then cut" points straight at a cause.
+## The shape of a good test plan
 
-## Web Inspector is the strongest tool available
+- **Lead with the one question that matters most**, and say it is the one that
+  matters. "If you only have ten minutes, do this." Everything else is optional.
+- **Number the questions.** They will answer by number.
+- **Give exact tap paths**, including the older-iOS variant. Settings moved
+  between iOS 17 and 18 and a wrong path reads as "it doesn't work".
+- **Paste-ready inputs.** A skin to paste, a URL to paste. Never "install a
+  skin" — they will pick a different one and the result will not be comparable.
+- **Ask for observations, not diagnoses.** "Is there a coloured bar across the
+  top?" beats "does CSS injection work?"
+- **Say what each answer changes.** A table mapping answer → consequence is what
+  makes the test feel worth doing, and it keeps you honest about whether it is.
+- **Invite partial answers explicitly.** "Got to step 3, here's the line, then it
+  crashed" is a result, not a failure.
 
-`webView.isInspectable = true` in DEBUG (iOS 16.4+) lets Safari on the Mac attach to the app's webview — Develop menu → device name → the page. Real console, real DOM, real breakpoints, on-device.
+## Getting a useful failure report
 
-Whenever a failure is inside injected JS, the ask is not "does it work" but "attach Safari Web Inspector and paste the console output". That converts a guessing game into a stack trace. Put the attach instructions in TESTING.md once, then reference them; don't retype them per PR.
+Ask for **what you expected** and **what you saw**, separately. For a skin that
+did not apply, the manager's Log tab holds a per-skin log — that is the thing to
+ask for, because on a phone there is no console.
 
-Ask for the in-app log view's contents too, since it captures document-start activity that Web Inspector may miss if attached late.
+The `Device test report` issue template collects the structured half. Use it for
+routine checks; write a bespoke issue when the questions are specific.
 
-## Asking for failure reports
+## After the report
 
-Request, in this order:
-1. Which step failed, and what happened instead.
-2. Verbatim Xcode errors, or verbatim console output — not a summary. Paraphrased error messages lose the part that identifies the cause.
-3. Device model and iOS version, if media-related. Behavior differs across versions.
-4. Whether it also fails in the simulator, if the test allows it — that narrows platform-specific vs. logic bugs immediately.
-
-Say what you'll do with the answer, so the user knows which detail matters.
-
-## Phase 0 spike plan
-
-The background-audio spike deserves a purpose-built plan, because it decides the roadmap. Test against at least two different sites, on a real device, checking: playback continues after backgrounding; after screen lock; past 60 seconds; past 10 minutes; through an incoming notification; and whether the page pauses itself (visible on reopen as a paused player) versus the audio session dying (audio stops, player still shows playing). Those two failure modes have different fixes and only the second one blocks the roadmap — make sure the plan distinguishes them.
+Write down what is now known that was not, in `docs/VERIFICATION.md` or the
+`extension-injection` skill. A device answer that lives only in a closed issue
+will be re-asked in three months.
