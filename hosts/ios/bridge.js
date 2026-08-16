@@ -133,8 +133,8 @@ function toError(payload) {
  * typo in a method name cannot silently become a message Swift ignores.
  */
 const FORWARDED = {
-    page: ["reload", "stop", "back", "forward", "zoom", "evaluate", "snapshot", "readability", "find"],
-    tabs: ["list", "current", "open", "close", "activate", "move", "pin", "group"],
+    page: ["navigate", "reload", "stop", "back", "forward", "zoom", "evaluate", "snapshot", "readability", "find"],
+    tabs: ["list", "current", "open", "navigate", "close", "activate", "move", "pin", "group"],
     native: ["share", "download", "notify", "lock", "safeArea", "haptic"]
 };
 
@@ -172,7 +172,12 @@ export function createIosHost(bridge, capabilities = [...HOST_PROFILES.ios]) {
         theme: forward("chrome", "theme"),
         hide: forward("chrome", "hide"),
         show: forward("chrome", "show"),
-        toolbar: { add: forward("chrome.toolbar", "add"), remove: forward("chrome.toolbar", "remove") },
+        toolbar: {
+            add: forward("chrome.toolbar", "add"),
+            remove: forward("chrome.toolbar", "remove"),
+            list: forward("chrome.toolbar", "list"),
+            onChanged: (fn) => subscribe("chrome.toolbar", fn)
+        },
         addressBar: { set: forward("chrome.addressBar", "set") },
         menu: { add: forward("chrome.menu", "add"), remove: forward("chrome.menu", "remove") },
         newTab: { set: forward("chrome.newTab", "set") },

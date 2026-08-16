@@ -5,9 +5,14 @@
 # content script skins a real page, and the injection engine behaves correctly
 # in a real WebKit engine.
 #
-# DOES NOT: say anything about Safari on iOS. No CI runner can load a Safari Web
-# Extension onto a phone. That gap is the subject of docs/VERIFICATION.md and is
-# closed by a human with a device, not by this file.
+# ALSO DOES: typecheck the iOS browser shell's Swift against stub frameworks, so
+# an invented method or a wrong signature fails here rather than on a Mac an
+# hour later. It does not compile against the real SDK; see the job's comment.
+#
+# DOES NOT: say anything about Safari on iOS, or about how any of this behaves
+# on a phone. No CI runner can load a Safari Web Extension onto a device, and no
+# Linux runner has an iOS SDK. That gap is the subject of docs/VERIFICATION.md
+# and is closed by a human with a device, not by this file.
 name: ci
 on:
   pull_request:
@@ -59,6 +64,24 @@ jobs:
           name: extension
           path: dist/
           retention-days: 14
+
+  swift-typecheck:
+    name: swift typecheck
+    runs-on: ubuntu-latest
+    container: swift:6.1
+    steps:
+      - uses: actions/checkout@v4
+      # Compiles apple/Sources/Browser — the real browser shell, unmodified —
+      # against hand-written stubs of SwiftUI, UIKit, WebKit and Combine in
+      # apple/Harness/Sources. There is no iOS SDK on a Linux runner, so this
+      # proves the Swift is internally consistent and agrees with the API
+      # surface the stubs describe. It does NOT prove that surface is Apple's;
+      # only .github/workflows/apple.yml, on a macOS runner, does that.
+      #
+      # Worth having anyway: it catches invented methods, wrong labels, wrong
+      # optionality and every type error, which is most of what goes wrong when
+      # writing Swift without a compiler. See apple/Harness/README.md.
+      - run: swift build --package-path apple
 
   e2e:
     name: real browsers

@@ -115,6 +115,11 @@ forever, which reads as slowness rather than as a bug.
 | `page` | `reload`, `stop`, `back`, `forward` |
 | `native` | `safeArea` |
 
+`native.safeArea()` answers with `{ top, leading, bottom, trailing }` — SwiftUI's
+`EdgeInsets`, in points. Leading and trailing rather than left and right because
+that is what SwiftUI reports and it stays correct in a right-to-left layout; the
+chrome document maps them.
+
 Everything else in `docs/BROWSER-API.md` — `chrome.*`, `net.*`, `page.evaluate`,
 `page.snapshot`, `page.readability`, `tabs.pin`, `tabs.group`, and the rest of
 `native` — is marked `// TODO(api):` at the point where it would be handled and

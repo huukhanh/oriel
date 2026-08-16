@@ -37,6 +37,7 @@ Everything the extension version had, unchanged:
 Added by the browser:
 
 ```js
+oriel.page.navigate(url, { replace })  // this tab, this document
 oriel.page.reload({ cache })
 oriel.page.stop()
 oriel.page.back() / .forward()
@@ -56,6 +57,7 @@ a skin patches a site's own framework, and no extension API offers it reliably.
 oriel.tabs.list()                      // [{ id, url, title, active, pinned, group, loading }]
 oriel.tabs.current()
 oriel.tabs.open(url, { background, after, group })
+oriel.tabs.navigate(id, url, { replace })   // load a URL into an existing tab
 oriel.tabs.close(id) / .activate(id) / .move(id, index)
 oriel.tabs.pin(id, pinned)
 oriel.tabs.group(ids, { name, colour })
@@ -77,6 +79,8 @@ oriel.chrome.dom(ops)                  // layout operations against the browser'
 oriel.chrome.theme({ tokens })         // the design tokens the whole UI reads
 oriel.chrome.toolbar.add({ id, icon, title, position, onTap })
 oriel.chrome.toolbar.remove(id)
+oriel.chrome.toolbar.list()            // what is registered, including other skins'
+oriel.chrome.toolbar.onChanged(fn)     // so the chrome document can re-render
 oriel.chrome.addressBar.set({ placeholder, hidden, transform })
 oriel.chrome.gesture.on("swipe-left" | "long-press" | "pull-down", fn)
 oriel.chrome.menu.add({ target: "link" | "image" | "page", title, onTap })
@@ -87,6 +91,20 @@ oriel.chrome.hide(part) / .show(part)  // "tabs" | "toolbar" | "address" | "stat
 `chrome.theme` is deliberately the *documented* way to recolour the browser;
 `chrome.css` is the escape hatch under it. A skin that only sets tokens keeps
 working when the UI changes shape.
+
+A toolbar item is `{ id, icon, title, position, onTap }`:
+
+- `icon` is **plain text** — one or two characters, an emoji, or a short label.
+  It is rendered as text, never as markup, because the toolbar lives in the
+  browser's own document and that document has the browser's privileges.
+- `position` is a number. Items without one sort after items with one, and ties
+  keep insertion order, so two skins that both omit it stay stable relative to
+  each other.
+- `title` is required and is what a screen reader reads.
+
+`toolbar.add` is a skin talking to the browser; `toolbar.onChanged` is the
+browser's own interface finding out. Both directions have to exist, or the
+chrome document has no way to learn that a skin registered something.
 
 ### 2.4 `oriel.net` — requests
 

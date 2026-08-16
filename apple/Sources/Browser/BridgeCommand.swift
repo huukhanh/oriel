@@ -99,7 +99,13 @@ struct BridgeReply {
     func jsonObject() -> [String: Any] {
         var object: [String: Any] = ["id": id, "ok": ok]
         if ok {
-            object["value"] = value ?? NSNull()
+            if let value = value {
+                object["value"] = value
+            } else {
+                // Written out rather than `value ?? NSNull()` so the type of
+                // the expression is not something a reader has to work out.
+                object["value"] = NSNull()
+            }
         } else {
             object["error"] = [
                 "code": errorCode ?? "error",
