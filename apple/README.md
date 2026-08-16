@@ -46,6 +46,7 @@ message bridge, and tab lifecycle. Nothing else belongs here. See
 | `Sources/Browser/WebViewFactory.swift` | Builds the shared configuration and the user scripts, owns every web view, and is the navigation delegate. |
 | `Sources/Browser/Bridge.swift` | `WKScriptMessageHandler`. The transport under the `ios` host in `engine/host/contract.js`. |
 | `Sources/Browser/BridgeCommand.swift` | The wire format, both directions. |
+| `Package.swift`, `Harness/` | A typecheck harness: stub frameworks that let a Linux box compile all of the above. Not shipped. See `Harness/README.md`. |
 
 ## The bundle layout
 
@@ -139,7 +140,20 @@ returns `unsupported` today. Nothing is stubbed silently.
 
 ## Compile status
 
-Written on a machine with no Xcode, no simulator and no Swift compiler. The
-`apple` workflow in `.github/workflows/apple.yml` is the first thing that
-compiles it. That workflow currently runs `pnpm build --target safari` only and
-will need `dist/ios/` built too, or the app target's copy phase stops it.
+There is no Xcode and no iOS SDK here, but there is a Swift compiler, and
+
+```sh
+swift build --package-path apple
+```
+
+typechecks `Sources/Browser` — the real files, unmodified — against stub
+frameworks in `Harness/`. It is green, and CI runs it on every pull request as
+the `swift typecheck` job. **Read `Harness/README.md` before trusting that.** It
+proves the Swift is internally consistent and agrees with the API surface the
+stubs describe; it does not prove that surface is Apple's. The stubs are the
+list of signatures a human should check against Xcode's autocomplete.
+
+The macOS job in `.github/workflows/apple.yml` is still the first thing that
+sees the real SDK. That workflow currently runs `pnpm build --target safari`
+only and will need `dist/ios/` built too, or the app target's copy phase stops
+it before the compiler is reached.
