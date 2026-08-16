@@ -1,93 +1,102 @@
 ---
 name: linux-verification
-description: What can actually be proven on the headless Ubuntu dev box — Foundation-only Swift unit tests for the Core package, Node/jsdom tests for all injected JavaScript, linting, and the harness that runs them. Use this skill before opening any PR, when adding logic that could be tested, when deciding whether something belongs in Core or the app target, and whenever setting up or fixing CI. Trigger it any time you are about to claim something works — it defines the difference between "tested" and "assumed" on this project.
+description: What can actually be proven on the headless Linux dev box — Node unit tests for all pure logic, the built extension in a real Chromium, the injection engine in a real WebKit, and the lint rule that keeps the core testable. Use this before opening any PR, when adding logic that could be tested, when deciding where a piece of code belongs, and whenever setting up or fixing CI. Trigger it any time you are about to claim something works — it defines the difference between "tested" and "assumed" on this project.
 ---
 
-# Verification on a machine with no Xcode
+# Verification on a machine with no Safari
 
-Two things run here and nothing else: Foundation-only Swift, and Node. Everything provable must be pushed into one of them.
+Three things run here. Everything provable has to be pushed into one of them.
+
+```
+pnpm lint       # node --check on every file, plus the core purity rule
+pnpm test       # Node + jsdom, milliseconds
+pnpm build      # dist/{chrome,firefox,safari}
+pnpm test:e2e   # real Chromium with the extension loaded, and real WebKit
+```
 
 ## Layout
 
 ```
-Core/                    swift build && swift test  ← runs on Linux
-  Sources/Core/          Foundation only. No WebKit/UIKit/SwiftUI/SwiftData.
-  Tests/CoreTests/
-web/                     npm test                   ← runs on Linux
-  src/                   prelude.js, wrapper-runtime.js, gm-shim.js, builtins/*.js
-  test/                  vitest + jsdom
-App/                     unbuildable here. Keep thin.
+extension/src/core/       Pure. No chrome.*, browser.*, window, localStorage, fetch.
+extension/src/shared/     The message protocol and the API shim. Touches chrome.*.
+extension/src/background/ Service worker. Not directly testable; keep it thin.
+extension/src/content/    The engine. Takes its document as an argument where it can.
+extension/src/ui/         views.js and varsform.js are pure functions of data → DOM.
+tools/oriel/              The authoring CLI. Zero dependencies, imports core/ for real.
+test/                     vitest. Everything above except background/.
+e2e/                      Playwright. The built extension, and the engine.
+apple/                    Unbuildable here. Three short Swift files, and that is the point.
 ```
 
-Both `Core/` and `web/` are consumed by the app as resources/dependencies. The app target should be glue: create the webview, ask `Core` what to inject, hand it the strings.
+## The purity rule is load-bearing
 
-## The pressure to apply
+`scripts/lint.mjs` fails the build if anything in `core/` touches `chrome.*`,
+`browser.*`, `window.*`, `localStorage` or `fetch(`. That single rule is why the
+targeting engine, four parsers, the layout engine, the variable system and the
+GitHub resolver are all testable in Node — which is most of the product and
+nearly all of the subtle part.
 
-When a task looks like platform work, find the provable kernel inside it and move that kernel to `Core` or `web`. Examples:
+`document` is allowed, because core modules take one as an argument. Keep that
+convention; it is what lets `domops.js` be tested in jsdom and run in a content
+script unchanged.
 
-| Task as stated | Provable kernel |
-|---|---|
-| "Inject matching scripts on navigation" | `Matcher.scripts(for: URL, from: [Script]) -> [Script]` |
-| "Parse pasted userscripts" | metadata block parser → struct, with fixtures |
-| "Wrap user source in a URL guard" | `WrapperBuilder.wrap(source:patterns:runAt:) -> String`, snapshot-tested |
-| "Keep video playing in background" | the visibility-spoof JS itself, tested in jsdom |
-| "Store scripts" | `Codable` structs + migration functions; only the `@Model` shell is blind |
-| "Show which scripts affect this page" | same `Matcher`, different caller |
+**When a task looks like plumbing, find the provable kernel and move it.** If a
+PR contains engine code and no test changes, ask what was missed.
 
-If a PR contains platform code and zero test changes, ask whether the kernel was missed.
+## The two e2e suites, and why there are two
 
-## Swift tests
+**Chromium** is the only engine on Linux that can load a WebExtension. It proves
+the manifest parses, the service worker boots, the content script runs at
+`document_start`, and the message router answers — driven through a real
+extension page rather than by reaching into the worker, so an unreachable
+handler fails.
 
-```bash
-cd Core && swift build && swift test
-```
+**WebKit** shares JavaScriptCore and WebCore with Safari on iOS. It cannot load
+an extension, so `bundleForBrowser()` bundles the modules and hangs them off a
+global. This is where engine-level claims get settled: the HTML parser the
+sanitizer faces, the URL parser matching faces, real `requestAnimationFrame`,
+real CSP.
 
-Cover at minimum:
-- Glob → regex: `*://*.example.com/*` matching and, more importantly, **not** matching `https://evil.com/?x=example.com`, `https://notexample.com/`, `https://example.com.evil.com/`. Over-matching is a privacy bug — it ships the user's scripts to sites they didn't authorize.
-- Scheme, subdomain wildcard, path wildcard, trailing-slash, query-string, and fragment cases.
-- Metadata parsing: missing block, duplicate `@match`, unknown keys (must be ignored with a warning, never fatal), CRLF line endings, no trailing newline.
-- Wrapper generation: snapshot tests. Generated JS is a string; diff it. Then feed the generated string to the Node suite (below) so the snapshot is also *executed*, not just compared.
+Neither is Safari. `docs/VERIFICATION.md` says what that leaves.
 
-## JavaScript tests
+## Three environment traps, each of which names nothing when it bites
 
-```bash
-cd web && npm test
-```
+This box has no root. `scripts/setup-browsers-linux.sh` stages browser
+dependencies into `~/.local/pwdeps`, and `e2e/harness.js` puts them on the
+loader path automatically — nothing needs sourcing. But:
 
-jsdom gives a DOM, `history`, `location`, and events — enough to test the genuinely tricky parts:
+- **Extensions need `channel: "chromium"`.** Playwright's headless default is
+  `chrome-headless-shell`, which has no extension support at all. The symptom is
+  a service worker that never appears.
+- **WebKit needs Mesa pointed at the staged prefix** — `LIBGL_DRIVERS_PATH` and
+  `__EGL_VENDOR_LIBRARY_DIRS`, not just `WEBKIT_DISABLE_DMABUF_RENDERER`.
+  Otherwise "Could not create WPE EGL display" and the web process dies.
+- **With no fonts installed, Chromium loads a page and then closes it** a second
+  later while shaping text. No crash event, no console error — the test sees
+  only "Target page, context or browser has been closed". `stageFonts()` points
+  fontconfig at the staged fonts.
 
-- The wrapper runs its body when `location.href` matches and does not when it doesn't.
-- A simulated `pushState` to a matching route re-runs; to a non-matching route does not.
-- **Re-entry does not double-register.** Navigate away and back, assert one listener/observer, not two. This is the bug most likely to ship otherwise.
-- Cleanup handlers fire before re-run.
-- `history.pushState` is patched exactly once even with ten scripts loaded.
-- The GM shim's `postMessage` calls go to a stubbed `window.webkit.messageHandlers`, so the bridge contract is pinned by tests on both sides.
-- Console capture forwards and still calls through to the original console.
-- The visibility-spoof script: `document.hidden` reads false and `visibilitychange` doesn't fire after a simulated background event.
+## Writing tests that are worth their place
 
-jsdom is not WebKit — it won't catch real-site behavior. It does catch logic errors, which is most of what goes wrong here.
-
-## Lint
-
-```bash
-swift-format lint --recursive Core App    # if installed; catches unbalanced syntax even in App
-npx eslint web/src web/test
-node --check web/src/*.js                 # zero-dependency syntax gate
-```
-
-`node --check` on every generated wrapper string is cheap and catches template-string mistakes in the Swift generator — pipe the snapshot output through it in CI.
-
-## CI
-
-GitHub Actions, `ubuntu-latest`, on every PR: Swift build + test, npm test, lint. There is no macOS job — say so in the workflow comments so nobody assumes the green check means it builds for iOS. Name the workflow `linux-checks` rather than `build` for the same reason.
+- Table-drive the security boundary. `target.js` has 235 tests because
+  over-matching ships a stranger's CSS onto a page the user never authorised.
+- Assert the *undo*, not just the change. Every layout operation is tested by
+  applying it and then asserting `document.body.innerHTML` is byte-identical.
+- Prove a test is not vacuous. Mutate the implementation and check the test
+  fails; several tests here were verified that way and the practice caught a
+  dedupe that was doing nothing.
+- Test the path the e2e suite *cannot* reach. Chromium always takes the
+  browser-injection path, so the constructed-stylesheet and `<style>` fallbacks
+  — the ones Safari will use — are only ever covered by unit tests.
 
 ## Reporting
 
-In every PR, state both halves plainly:
+State both halves, always:
 
 ```
-Proven here:  Core 23/23, web 11/11, lint clean
-Not proven:   everything in App/ — needs Xcode
+Proven:     lint clean · 724 unit · 24 e2e (chromium + webkit)
+Not proven: everything under apple/, and everything about Safari's extension host
 ```
 
-Never let "CI is green" stand in for "it works". On this project those are unrelated claims, and the user is relying on you not to blur them.
+Never let "CI is green" stand in for "it works". On this project those are
+unrelated claims, and the user is relying on you not to blur them.

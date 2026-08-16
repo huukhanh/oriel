@@ -1,101 +1,91 @@
 ---
 name: github-flow
-description: Branch, commit, PR, review-response and merge conventions for this project, including the device-verification gate that decides when a PR may be merged. Use this skill whenever creating a branch, writing commits, opening or updating a pull request, responding to the user's build results, or merging anything. Trigger it any time the user says "make a PR", "merge it", "ship it", "it builds", "it's broken", or asks about repo state. It defines when merging is and is not allowed — check it before every merge, no exceptions.
+description: Branch, commit, PR, review-response and merge conventions for this project, including the verification gate that decides when a PR may be merged. Use this whenever creating a branch, writing commits, opening or updating a pull request, responding to a device report, or merging anything. Trigger it any time the user says "make a PR", "merge it", "ship it", "it builds", "it's broken", or asks about repo state. It defines when merging is and is not allowed — check it before every merge.
 ---
 
 # Git and PR flow
 
-Uses `gh`. Confirm auth once per session with `gh auth status`; if it fails, ask the user for a token rather than guessing at credentials.
+Uses `gh`. Confirm auth once per session with `gh auth status`.
 
 ## Branches
 
-`<type>/<issue>-<slug>` — `feat/12-match-compiler`, `fix/31-double-listener`, `spike/1-background-audio`, `chore/8-ci`.
+`<type>/<issue>-<slug>` — `feat/12-usercss-vars`, `fix/31-spa-teardown`,
+`chore/8-ci`. Types: `feat`, `fix`, `spike`, `chore`, `docs`, `refactor`.
 
-Types: `feat`, `fix`, `spike`, `chore`, `docs`, `refactor`.
-
-Branch from up-to-date `main`. One issue per branch. If a task turns out to be two things, split the branch — a PR that mixes provable Core work with blind platform work forces the user to review both at the strictness of the blind half.
+Branch from up-to-date `main`. One issue per branch. If a task turns out to be
+two things, split it — a PR that mixes provable web work with blind Swift forces
+the whole thing to be reviewed at the strictness of the blind half.
 
 ## Commits
 
-Conventional commits, scoped to the module: `feat(core): compile @match globs to NSRegularExpression`.
+Conventional commits, scoped to the module: `feat(core)`, `fix(content)`,
+`test(e2e)`, `feat(tools)`, `docs`.
 
-Body explains *why* when the reason isn't obvious from the diff. Note anything unverified:
+The body explains **why**, and says what is unverified. The most valuable commit
+messages in this repository are the ones recording a measurement — that Chromium
+blocks `eval` in content scripts, that a `<style>` element loses to
+`style-src 'self'`. Those cost hours to find and a sentence to record.
+
+Never use `--no-verify`. Never force-push a branch the user has already pulled.
+
+## PR body
+
+`.github/pull_request_template.md` holds the shape. Fill every section, and be
+exact in the two that matter:
 
 ```
-fix(injection): patch history.pushState once in the prelude
+## Proven
+lint clean · 724 unit · 24 e2e (chromium + webkit)
 
-Each wrapper patching independently produced N nested wrappers and
-re-entrant fire() calls. Prelude now patches once and dispatches
-__inj:navigate; wrappers listen.
-
-Unverified on device. web/ tests cover the single-patch invariant.
+## Not proven
+Everything under apple/ — no Swift toolchain here.
+Everything about Safari's extension host — no Safari anywhere in the loop.
 ```
 
-Never use `--no-verify`. Never force-push a branch the user has already pulled to their Mac — they lose their local build state and the reason will not be obvious.
-
-## PR body template
-
-`.github/pull_request_template.md` holds this; fill every section.
-
-```markdown
-## What
-One paragraph. Closes #12.
-
-## Design notes
-Non-obvious choices and rejected alternatives.
-
-## Proven on Linux
-Core: 23/23 · web: 11/11 · lint clean
-(or: nothing — this PR is platform-only)
-
-## NOT proven
-Everything under App/. No compiler on the dev box.
-
-## Assumptions (Tier 2 API — check these first)
-- `WKUserContentController.addScriptMessageHandler(_:contentWorld:name:)` — label order assumed
-
-## New files (add to the Xcode target)
-- App/Injection/PreludeInstaller.swift
-
-## Device test plan
-1. Build to a real device (not simulator — this touches PiP).
-2. Open youtube.com, play a video, tap PiP in the toolbar.
-   Expect: PiP window appears, audio continues.
-3. Lock the screen. Expect: audio continues ≥ 30s.
-4. Reopen the app. Expect: video resumes inline, no duplicate audio.
-
-Report back: pass/fail per step, plus any Xcode errors verbatim.
-```
-
-## Labels
-
-`needs-device-check` — contains platform code, blocked on the user.
-`linux-verified` — the automated half passed.
-`device-verified` — the user confirmed on hardware.
-`spike` — throwaway, may be merged or closed unmerged; either is fine.
+If a change alters behaviour on Safari specifically, say what you expect and how
+a person with a phone could tell whether it happened.
 
 ## The merge gate
 
-This is the part that keeps `main` trustworthy.
+**Merge on your own** when CI is green and the PR touches only `extension/`,
+`tools/`, `test/`, `e2e/`, `skins/`, `docs/` or CI config. These are proven here;
+blocking them on a human wastes the one scarce resource on the project.
 
-**Merge without asking** when the PR touches only `Core/`, `web/`, `docs/`, or CI config, and Linux checks pass. These are proven; blocking them on a human wastes the one scarce resource on the project.
+**Do not merge on your own** a PR whose *behaviour on a device* is the point —
+anything changing how skins reach the page on Safari, the container app's setup
+flow, or the extension's permissions. Those need a device report first.
 
-**Never merge on your own** any PR containing files that only Xcode can compile — `App/`, `.xcodeproj`, `project.yml`, `Info.plist`, entitlements. Merge only after the user has confirmed a successful build, ideally as a PR comment or an explicit "it builds, merge it". A verbal pass on the test plan counts; silence does not.
+`apple/` compiles in CI (`.github/workflows/apple.yml`, manual and tag-only,
+macOS runners are ten times the price). A green run means the Swift builds and
+the web extension landed inside the `.appex`. It does **not** mean anything
+works on a phone — only issue #61-style device reports do that.
 
-The reason is narrow and worth stating: `main` should always be a state the user can build. If unbuildable code lands, the next branch inherits it, and the failure is discovered later attached to the wrong change. Keeping the gate means a broken build is always attributable to exactly one PR.
+Squash merge and delete the branch, unless the PR is a large piece of work whose
+individual commits carry reasoning worth keeping; then use a merge commit and
+say why.
 
-Squash merge. Delete the branch. Comment on the issue with what shipped and what remains.
+Comment on the issue with what shipped and what remains.
 
-## Handling the user's build report
+## Handling a device report
 
-**Pass** → apply `device-verified`, merge, close the issue, report the next task.
+**Pass** → merge, close the issue, say what is now known that was not.
 
-**Compile errors** → read the first error, fix forward on the same branch, push, ask for one more build. Record any corrected API signature in `docs/api-notes.md` — that file is the project's memory of what the compiler actually accepts, and it should be read before writing platform code.
+**Build errors** → read the *first* error only; Swift cascades are noise after
+it. Fix forward on the same branch, push, ask for one more build.
 
-**Builds but behaves wrong** → this is design information, not a typo. Before patching, say what you expected to happen and ask which part of the observed behavior differs. Guessing at runtime behavior you can't observe is how a one-round fix turns into five.
+**Builds but behaves wrong** → this is design information, not a typo. Say what
+you expected before proposing a patch. Guessing at runtime behaviour you cannot
+observe is how a one-round fix turns into five.
 
-**Two failed rounds on the same PR** → stop. Say plainly that the model of the API is wrong rather than the code, and propose one of: shrink the PR to the smallest thing that could work, have the user paste the relevant Xcode autocomplete or docs, or drop the approach.
+**Two failed rounds on the same PR** → stop. Say plainly that the model of the
+platform is wrong rather than the code, and propose shrinking the change to the
+smallest thing that could work.
+
+Record anything learned about the platform in the `extension-injection` skill or
+`docs/VERIFICATION.md`. Those files are the project's memory of what is actually
+true, and they should be read before writing platform code, not after.
 
 ## Releases
 
-Tag `v0.x.0` when a phase completes. Release notes list what was device-verified — not what was merged.
+Tag `v0.x.0`. The `apple` workflow builds and attaches an unsigned `.ipa` on a
+tag. Release notes list what was **device-verified** — not what was merged.

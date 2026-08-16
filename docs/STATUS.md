@@ -30,7 +30,7 @@ lint clean · 724 unit tests · 24 end-to-end tests in real browsers
 | `ui/*` | Popup and manager, as pure render functions. 73 tests. |
 | `tools/oriel` | The authoring CLI. 26 tests. |
 | `skins/` | Three worked examples, installed by the e2e suite. |
-| `apple/` | Container app and Safari Web Extension target, XcodeGen. **Never compiled.** |
+| `apple/` | Container app and Safari Web Extension target, XcodeGen. **Compiles green in CI**; never run on a device. |
 | CI | `ci.yml` on every push; `apple.yml` manual and tag-only. |
 
 ## What running it in real browsers changed
@@ -52,14 +52,12 @@ argument for the e2e suites existing at all:
 
 ## Left to do
 
-1. **A device test.** Nothing here can touch Safari, and the open question that
-   decides how much of the format works on iOS — whether Safari lets an
-   extension run code it downloaded — is one line in the Capabilities panel.
-   [`VERIFICATION.md`](VERIFICATION.md#what-a-device-test-is-for) lists what is
-   worth a build cycle.
-2. **`apple/` has never been compiled.** `apple.yml` is written and has never
-   run. Expect the first run to fail on something small.
-3. **Smaller gaps.** `oriel check <gallery-dir>` does not recognise an
+1. **A device test — [#61](https://github.com/huukhanh/oriel/issues/61).**
+   Nothing here can touch Safari, and the open question that decides how much of
+   the format works on iOS — whether Safari lets an extension run code it
+   downloaded — is one line in the Capabilities panel. An unsigned `.ipa` is
+   already built and attached to the `apple` workflow run, so it needs no Mac.
+2. **Smaller gaps.** `oriel check <gallery-dir>` does not recognise an
    `index.json`; there is no test for the background's storage layer; the
    manager's editor is a textarea with a line number rather than anything
    cleverer.
