@@ -2,10 +2,16 @@
 
 **Rebuild any website's interface, and share the result as a file on GitHub.**
 
-Oriel is a browser extension that stores and applies **skins** — packages of
-CSS, declarative layout operations and optional JavaScript that change a site's
-interface completely. Not a dark mode. A different front end for someone else's
-website.
+Oriel is a **browser** that stores and applies **skins** — packages of CSS,
+declarative layout operations and JavaScript that change a site's interface
+completely. Not a dark mode. A different front end for someone else's website.
+
+It is a browser rather than an extension because an extension is a guest: it
+cannot reliably run a skin's JavaScript, cannot see the page's own navigation,
+and cannot touch the browser's own interface. Oriel's tab strip, address bar and
+toolbar are documents, skinnable like any other — and it exports a native API so
+a skin can manage tabs, intercept requests, reach the device, and publish
+functions for other skins to call.
 
 Install a skin by pasting it, or by giving Oriel a GitHub link:
 
@@ -29,20 +35,37 @@ Oriel is the other shape of that idea: **the skin is the unit**, it is a file in
 a Git repository, and it works on a phone. Someone who can write CSS can rebuild
 a site's interface, commit it, and send you a link.
 
+Building it as an extension first was worth doing and is why the engine is well
+tested — but it hit a ceiling that could not be worked around, and
+[decision 001](docs/decisions/001-browser-not-extension.md) records exactly
+where and why.
+
 ## What a skin can do
 
 | | |
 |---|---|
 | **CSS** | Restyle and relayout, injected before first paint, unaffected by the page's own Content-Security-Policy. |
-| **Layout operations** | Move a node into another parent, wrap it, delete it, re-order children, rewrite text. Declarative JSON, interpreted by Oriel — so it works even where the browser forbids extensions from running downloaded code. |
-| **JavaScript** | The escape hatch, with a small API for the things every skin needs. Runs where the platform permits it; Oriel says plainly when it does not. |
+| **Layout operations** | Move a node into another parent, wrap it, delete it, re-order children, rewrite text. Declarative JSON, interpreted by Oriel, so it needs no code execution at all. |
+| **JavaScript** | Always available in the browser, with an API for the things every skin needs. |
+| **The browser itself** | Tabs, the toolbar, the address bar, context menus, gestures — see [`docs/BROWSER-API.md`](docs/BROWSER-API.md). |
+| **Requests** | Block, redirect, rewrite headers, or answer a request outright. |
+| **Other skins** | A skin can export functions for other skins to import, so a reader-mode skin's extractor is reusable without either author coordinating. |
 | **Settings** | A skin declares its variables; Oriel generates the settings UI and applies changes to the open page live. |
 
 The full contract is [`docs/SKIN-FORMAT.md`](docs/SKIN-FORMAT.md).
 
-## Install the extension
+## Install it
 
-**Chrome, Edge, Brave, Firefox** — build it and load it unpacked:
+**The browser, on an iPhone or iPad.** It is a sideloaded app, signed with your
+own Apple ID — see [`docs/SAFARI.md`](docs/SAFARI.md) for the full path,
+including what to do when something fails. CI builds an unsigned `.ipa` you can
+sign yourself, so no Mac is needed to get one.
+
+**On a desktop, for authoring.** The same engine also builds as a WebExtension.
+It cannot do everything the browser can — no tabs API of its own, no browser
+chrome, and Chromium will not run a skin's JavaScript at all — but it is the
+fastest way to iterate on a skin's CSS and layout, and it is what the
+end-to-end suite runs against:
 
 ```sh
 pnpm install && pnpm build
@@ -50,10 +73,6 @@ pnpm install && pnpm build
 
 - Chromium: `chrome://extensions` → Developer mode → *Load unpacked* → `dist/chrome`
 - Firefox: `about:debugging` → *This Firefox* → *Load Temporary Add-on* → `dist/firefox/manifest.json`
-
-**Safari, iPhone and Mac** — see [`docs/SAFARI.md`](docs/SAFARI.md). A Safari
-Web Extension ships inside a container app, so this one needs a Mac to sign and
-a sideloading step to install. CI builds the unsigned app on every push.
 
 ## Write a skin
 
