@@ -10,7 +10,7 @@
  * Usage: node scripts/build.mjs [--target chrome|firefox|safari|all] [--watch] [--minify]
  */
 import { build, context } from "esbuild";
-import { cp, mkdir, rm, writeFile, readFile, readdir } from "node:fs/promises";
+import { cp, mkdir, rm, writeFile, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -98,40 +98,42 @@ async function buildTarget(target) {
 }
 
 /**
- * A shipped build must not contain a `sendMessage` type that
- * shared/protocol.js does not declare. Cheap to check, and it catches the
- * class of typo that produces a silent no-op on a phone.
+ * Every file the manifest names must actually be in the output. A manifest
+ * pointing at a file that is not there produces a browser error that names the
+ * manifest, not the missing file, and on a phone there is no console to read it
+ * in anyway.
+ *
+ * The message protocol is checked separately and statically, in
+ * test/protocol.test.js — by the time the bundle exists the constants have been
+ * inlined and grepping for them proves nothing.
  */
-async function checkProtocolUse(outDir) {
-    const protocol = await readFile(join(src, "shared", "protocol.js"), "utf8");
-    const declared = new Set([...protocol.matchAll(/"((?:page|ui|event)\.[a-zA-Z]+)"/g)].map((m) => m[1]));
-    const problems = [];
-    for (const name of ["background.js", "content.js", "popup.js", "manager.js"]) {
-        const file = join(outDir, name);
-        if (!existsSync(file)) continue;
-        const text = await readFile(file, "utf8");
-        for (const [, used] of text.matchAll(/"((?:page|ui|event)\.[a-zA-Z]+)"/g)) {
-            if (!declared.has(used)) problems.push(`${name}: undeclared message "${used}"`);
-        }
-    }
-    return [...new Set(problems)];
+async function checkManifestFiles(outDir, target) {
+    const manifest = manifestFor(target);
+    const referenced = [
+        ...(manifest.background?.service_worker ? [manifest.background.service_worker] : []),
+        ...(manifest.background?.scripts ?? []),
+        ...(manifest.content_scripts ?? []).flatMap((entry) => [...(entry.js ?? []), ...(entry.css ?? [])]),
+        ...(manifest.action?.default_popup ? [manifest.action.default_popup] : []),
+        ...(manifest.options_ui?.page ? [manifest.options_ui.page] : []),
+        ...Object.values(manifest.icons ?? {})
+    ];
+    return referenced.filter((file) => !existsSync(join(outDir, file))).map((file) => `${target}: missing ${file}`);
 }
 
 const built = [];
 for (const target of targets) {
-    built.push(await buildTarget(target));
+    built.push([target, await buildTarget(target)]);
 }
 
 let failed = false;
-for (const outDir of built) {
-    const problems = await checkProtocolUse(outDir);
-    for (const p of problems) {
-        process.stderr.write(`build: ${p}\n`);
+for (const [target, outDir] of built) {
+    for (const problem of await checkManifestFiles(outDir, target)) {
+        process.stderr.write(`build: ${problem}\n`);
         failed = true;
     }
 }
 
 if (!watch) {
-    process.stdout.write(`built ${built.map((d) => relative(root, d)).join(", ")}\n`);
+    process.stdout.write(`built ${built.map(([, dir]) => relative(root, dir)).join(", ")}\n`);
 }
 if (failed) process.exit(1);

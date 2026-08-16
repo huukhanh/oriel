@@ -176,6 +176,11 @@ function unknown(reason) {
     return { kind: "unknown", candidates: [], describe: reason };
 }
 
+/** Omits `note` rather than setting it to `undefined`, so a candidate without one has no such key. */
+function candidate(url, via, expects, note) {
+    return note ? { url, via, expects, note } : { url, via, expects };
+}
+
 function resolveURL(url) {
     const scheme = url.protocol.slice(0, -1).toLowerCase();
 
@@ -198,7 +203,7 @@ function resolveURL(url) {
         return withInsecureNote(
             {
                 kind: "raw",
-                candidates: [{ url: stripQueryHash(url).href, via: "raw", expects: "skin" }],
+                candidates: [candidate(stripQueryHash(url).href, "raw", "skin")],
                 describe: `raw file at ${host}`
             },
             insecure
@@ -206,7 +211,7 @@ function resolveURL(url) {
     }
 
     return withInsecureNote(
-        { kind: "url", candidates: [{ url: url.href, via: "raw", expects: "skin" }], describe: `URL: ${url.href}` },
+        { kind: "url", candidates: [candidate(url.href, "raw", "skin")], describe: `URL: ${url.href}` },
         insecure
     );
 }
@@ -224,7 +229,7 @@ function resolveGithubCom(url, insecure) {
 
     if (!owner || !repo) {
         return withInsecureNote(
-            { kind: "url", candidates: [{ url: url.href, via: "raw", expects: "skin" }], describe: `URL: ${url.href}` },
+            { kind: "url", candidates: [candidate(url.href, "raw", "skin")], describe: `URL: ${url.href}` },
             insecure
         );
     }
@@ -260,9 +265,7 @@ function resolveGithubCom(url, insecure) {
                 // gist.githubusercontent.com and api.github.com, which all send `*`.
                 // Fetching this only works because the extension holds a host
                 // permission for github.com, not because of CORS.
-                candidates: [
-                    { url: href, via: "raw", expects: "skin", note: "release asset — fetched via host permission, not CORS" }
-                ],
+                candidates: [candidate(href, "raw", "skin", "release asset — fetched via host permission, not CORS")],
                 describe: `GitHub release asset: ${owner}/${repo} ${tag}/${assetPath}`
             },
             insecure
@@ -270,7 +273,7 @@ function resolveGithubCom(url, insecure) {
     }
 
     return withInsecureNote(
-        { kind: "url", candidates: [{ url: url.href, via: "raw", expects: "skin" }], describe: `URL: ${url.href}` },
+        { kind: "url", candidates: [candidate(url.href, "raw", "skin")], describe: `URL: ${url.href}` },
         insecure
     );
 }
@@ -307,22 +310,15 @@ function buildGistCandidates(user, gistId) {
     // GitHub resolves a gist raw URL by id alone; the username segment isn't
     // checked, so a missing one is filled in rather than treated as an error.
     const owner = user || "gist";
-    const rawGuess = {
-        url: `https://gist.githubusercontent.com/${encodeSegment(owner)}/${encodeSegment(gistId)}/raw/`,
-        via: "raw",
-        expects: "skin",
-        note: "guessing the gist has a single file"
-    };
-    const apiListing = {
-        url: `https://api.github.com/gists/${encodeSegment(gistId)}`,
-        via: "api",
-        expects: "listing",
-        note: "listing the gist's files"
-    };
+    const rawURL = `https://gist.githubusercontent.com/${encodeSegment(owner)}/${encodeSegment(gistId)}/raw/`;
+    const apiURL = `https://api.github.com/gists/${encodeSegment(gistId)}`;
     return {
         kind: "gist",
         gistId,
-        candidates: [rawGuess, apiListing],
+        candidates: [
+            candidate(rawURL, "raw", "skin", "guessing the gist has a single file"),
+            candidate(apiURL, "api", "listing", "listing the gist's files")
+        ],
         describe: user ? `GitHub Gist ${gistId} (${user})` : `GitHub Gist ${gistId}`
     };
 }
@@ -340,7 +336,7 @@ function resolveGithubPath({ kind, owner, repo, ref, path, note }) {
             repo,
             ref: effectiveRef,
             path,
-            candidates: [{ url: rawGithubURL(owner, repo, effectiveRef, path), via: "raw", expects: "skin", note }],
+            candidates: [candidate(rawGithubURL(owner, repo, effectiveRef, path), "raw", "skin", note)],
             describe: `GitHub file: ${owner}/${repo}@${effectiveRef}/${path}`
         };
     }
@@ -367,12 +363,7 @@ function resolveGithubPath({ kind, owner, repo, ref, path, note }) {
         repo,
         ref: effectiveRef,
         candidates: [
-            ...SKIN_FILENAMES.map((name) => ({
-                url: rawGithubURL(owner, repo, effectiveRef, name),
-                via: "raw",
-                expects: "skin",
-                note
-            })),
+            ...SKIN_FILENAMES.map((name) => candidate(rawGithubURL(owner, repo, effectiveRef, name), "raw", "skin", note)),
             listingCandidate(owner, repo, "", effectiveRef, "the repository root"),
             listingCandidate(owner, repo, "skins", effectiveRef, "skins/"),
             listingCandidate(owner, repo, "styles", effectiveRef, "styles/")
@@ -386,17 +377,15 @@ function dirCandidates(owner, repo, ref, dir, note) {
     // REST API is capped at 60 requests/hour/IP, so a guess that lands
     // directly on raw.githubusercontent.com (CDN-served, no quota) must never
     // pay for a round trip the common case didn't need.
-    const guesses = SKIN_FILENAMES.map((name) => ({
-        url: rawGithubURL(owner, repo, ref, `${dir}/${name}`),
-        via: "raw",
-        expects: "skin",
-        note
-    }));
-    return [...guesses, listingCandidate(owner, repo, dir, ref, dir)];
+    const guesses = SKIN_FILENAMES.map((name) =>
+        candidate(rawGithubURL(owner, repo, ref, `${dir}/${name}`), "raw", "skin", note)
+    );
+    return [...guesses, listingCandidate(owner, repo, dir, ref, dir, note)];
 }
 
-function listingCandidate(owner, repo, dir, ref, label) {
-    return { url: apiContentsURL(owner, repo, dir, ref), via: "api", expects: "listing", note: `listing ${label}` };
+function listingCandidate(owner, repo, dir, ref, label, extraNote) {
+    const note = extraNote ? `${extraNote}, listing ${label}` : `listing ${label}`;
+    return candidate(apiContentsURL(owner, repo, dir, ref), "api", "listing", note);
 }
 
 // --- owner/repo shorthand ---------------------------------------------------

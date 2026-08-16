@@ -26,11 +26,17 @@ export function parseVersion(v) {
     const raw = typeof v === "string" ? v : String(v);
     if (typeof v !== "string") return { parts: [], pre: null, raw, valid: false };
 
-    let s = v.trim().replace(/^[vV]/, "");
+    // A leading "v" (npm/GitHub tag style) or "=" (Tampermonkey's "pin exactly
+    // this version" prefix) carries no comparable information.
+    let s = v.trim().replace(/^[vV=]/, "");
 
     // Build metadata is always last and is opaque — drop it before anything
     // else so a stray "-" inside it (e.g. "+build-7") can't be mistaken for
-    // the pre-release delimiter.
+    // the pre-release delimiter. Neither Stylus nor Tampermonkey implements
+    // real semver; Tampermonkey specifically treats "+build" as significant
+    // ("1.12+1" < "1.12+2"), but we ignore it entirely, matching semver
+    // proper and Violentmonkey — two build tags of the same version are the
+    // same version as far as "is there an update" is concerned.
     const plus = s.indexOf("+");
     if (plus !== -1) s = s.slice(0, plus);
 
