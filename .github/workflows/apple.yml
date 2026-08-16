@@ -32,8 +32,12 @@ jobs:
       # If this is skipped the build fails in the copy phase with a message
       # saying exactly that, which is the point of checking there too.
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build --target safari
+      # Both, not just safari: the browser app target's copy phase needs
+      # dist/ios/ and fails the build before the compiler is reached without it.
+      - run: pnpm build
       - run: test -f dist/safari/manifest.json
+      - run: test -f dist/ios/engine.js
+      - run: test -f dist/ios/chrome.html
 
       - run: brew install xcodegen
       - run: xcodegen generate
