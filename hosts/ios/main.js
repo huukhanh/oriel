@@ -24,10 +24,21 @@ import { exposeFor } from "../../engine/host/contract.js";
 export const GLOBAL = "__oriel";
 
 /**
+ * Where Swift declares what it has actually implemented, in a user script
+ * injected before this one.
+ *
+ * This seam has to exist. The native side builds namespaces incrementally, and
+ * a capability list baked into JavaScript would claim things that are still a
+ * `TODO(api:)` on the other side — exactly the failure the Host contract exists
+ * to prevent.
+ */
+export const CAPABILITIES_GLOBAL = "__orielCapabilities";
+
+/**
  * @param {object} [options]
  * @param {object} [options.scope]  Defaults to `globalThis`. Injectable for tests.
  * @param {object} [options.messageHandler]
- * @param {string[]} [options.capabilities]  What the native side reports it has built.
+ * @param {string[]} [options.capabilities]  Overrides what the native side declared.
  */
 export function boot(options = {}) {
     const scope = options.scope ?? globalThis;
@@ -36,8 +47,12 @@ export function boot(options = {}) {
     // creates an iframe of itself gets this file twice in the same realm.
     if (scope[GLOBAL]) return scope[GLOBAL];
 
+    const declared = options.capabilities ?? scope[CAPABILITIES_GLOBAL];
     const bridge = createBridge({ messageHandler: options.messageHandler, scope });
-    const { host, dispatch } = createIosHost(bridge, options.capabilities);
+    // No list at all means an old or misconfigured shell. Trusting the full
+    // profile there would have every namespace claim to work and then answer
+    // `unsupported`, which is the worst of both — a skin cannot branch on it.
+    const { host, dispatch } = createIosHost(bridge, Array.isArray(declared) ? declared : []);
 
     const api = {
         version: typeof __ORIEL_VERSION__ === "string" ? __ORIEL_VERSION__ : "dev",
