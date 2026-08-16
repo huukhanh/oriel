@@ -43,6 +43,10 @@ final class WebViewFactory: NSObject, ObservableObject, WKNavigationDelegate {
     private var contentViews: [String: WKWebView] = [:]
     private var chromeView: WKWebView?
 
+    /// Surfaces already asked whether the engine landed. See
+    /// `verifyInjectionOnce`.
+    private var verified: Set<String> = []
+
     /// Read once, lazily, off the main bundle. The build fails long before this
     /// if the file is missing; nil here means someone hand-assembled a bundle.
     private lazy var engineSource: String? = WebViewFactory.loadEngineSource()
@@ -62,7 +66,7 @@ final class WebViewFactory: NSObject, ObservableObject, WKNavigationDelegate {
     func webView(for tab: Tab) -> WKWebView {
         if let existing = contentViews[tab.id] { return existing }
 
-        let configuration: WKWebViewConfiguration = makeConfiguration(surface: "page", isPrivate: tab.isPrivate)
+        let configuration: WKWebViewConfiguration = makeConfiguration(isPrivate: tab.isPrivate)
         let created: WKWebView = WKWebView(frame: CGRect.zero, configuration: configuration)
         created.navigationDelegate = self
         created.allowsBackForwardNavigationGestures = true
@@ -95,6 +99,7 @@ final class WebViewFactory: NSObject, ObservableObject, WKNavigationDelegate {
         webView.navigationDelegate = nil
         webView.configuration.userContentController.removeScriptMessageHandler(forName: Bridge.messageHandlerName)
         webView.removeFromSuperview()
+        verified.remove(id)
     }
 
     func forEachWebView(_ body: (WKWebView) -> Void) {
@@ -111,7 +116,7 @@ final class WebViewFactory: NSObject, ObservableObject, WKNavigationDelegate {
     func chromeWebView() -> WKWebView {
         if let existing = chromeView { return existing }
 
-        let configuration: WKWebViewConfiguration = makeConfiguration(surface: "chrome", isPrivate: false)
+        let configuration: WKWebViewConfiguration = makeConfiguration(isPrivate: false)
         let created: WKWebView = WKWebView(frame: CGRect.zero, configuration: configuration)
         created.navigationDelegate = self
         created.isOpaque = false
@@ -140,7 +145,7 @@ final class WebViewFactory: NSObject, ObservableObject, WKNavigationDelegate {
 
     // MARK: - Configuration
 
-    private func makeConfiguration(surface: String, isPrivate: Bool) -> WKWebViewConfiguration {
+    private func makeConfiguration(isPrivate: Bool) -> WKWebViewConfiguration {
         let configuration: WKWebViewConfiguration = WKWebViewConfiguration()
         configuration.allowsInlineMediaPlayback = true
         configuration.applicationNameForUserAgent = WebViewFactory.applicationNameForUserAgent
@@ -152,10 +157,11 @@ final class WebViewFactory: NSObject, ObservableObject, WKNavigationDelegate {
 
         let controller: WKUserContentController = configuration.userContentController
 
-        // Order matters: the surface flag and the transport have to exist
-        // before the engine runs, and all three before the page's own code.
-        controller.addUserScript(makeUserScript(WebViewFactory.surfaceSource(surface)))
-        controller.addUserScript(makeUserScript(WebViewFactory.bootstrapSource))
+        // The engine bundle is self-booting: `hosts/ios/main.js` establishes
+        // the bridge itself the moment it sees `webkit.messageHandlers`, and
+        // owns the whole wire format. There is deliberately no bootstrap
+        // shim here — a second implementation of the same protocol, written
+        // on the side that has no tests, is exactly the wrong place for one.
         if let engine = engineSource {
             controller.addUserScript(makeUserScript(engine))
         }
@@ -204,6 +210,16 @@ final class WebViewFactory: NSObject, ObservableObject, WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         syncTab(for: webView, reason: "titled")
+        verifyInjectionOnce(in: webView)
+    }
+
+    /// Ask the engine to say hello, the first time each web view finishes a
+    /// load. Once, not per navigation: this is a diagnostic, not a heartbeat.
+    private func verifyInjectionOnce(in webView: WKWebView) {
+        let label: String = tabID(for: webView) ?? "the chrome"
+        if verified.contains(label) { return }
+        verified.insert(label)
+        bridge?.verifyInjection(in: webView, describing: label)
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -253,100 +269,6 @@ final class WebViewFactory: NSObject, ObservableObject, WKNavigationDelegate {
         }
         return String(data: data, encoding: .utf8)
     }
-
-    private static func surfaceSource(_ surface: String) -> String {
-        return "window.__orielSurface = \"" + surface + "\";"
-    }
-
-    /// The JavaScript half of the transport.
-    ///
-    /// Kept here rather than in `engine/` because it is the transport, not the
-    /// engine: it knows the message handler name and the reply shape, both of
-    /// which are facts about this Swift. The engine's `ios` host is written
-    /// against `window.__orielBridge.send(namespace, method, args)` and nothing
-    /// below it.
-    ///
-    /// Deliberately ES5-flavoured and dependency-free. It runs at document
-    /// start on every frame of every page, including ones that have not loaded
-    /// yet, so it must not assume anything about the document.
-    private static let bootstrapSource: String = #"""
-    (function () {
-      if (window.__orielBridge) { return; }
-
-      var pending = Object.create(null);
-      var listeners = [];
-      var counter = 0;
-
-      function send(namespace, method, args) {
-        return new Promise(function (resolve, reject) {
-          var handler = window.webkit
-            && window.webkit.messageHandlers
-            && window.webkit.messageHandlers.oriel;
-          if (!handler) {
-            reject(new Error("The Oriel bridge is not available here."));
-            return;
-          }
-          counter = counter + 1;
-          var id = "c" + counter;
-          pending[id] = { resolve: resolve, reject: reject };
-          try {
-            handler.postMessage({ id: id, namespace: namespace, method: method, args: args || {} });
-          } catch (error) {
-            delete pending[id];
-            reject(error);
-          }
-        });
-      }
-
-      // Called by Swift, once per command, always.
-      function settle(reply) {
-        if (!reply || !reply.id) { return; }
-        var entry = pending[reply.id];
-        if (!entry) { return; }
-        delete pending[reply.id];
-        if (reply.ok) {
-          entry.resolve(reply.value === undefined ? null : reply.value);
-          return;
-        }
-        var message = (reply.error && reply.error.message) || "The browser refused the request.";
-        var failure = new Error(message);
-        failure.code = (reply.error && reply.error.code) || "error";
-        entry.reject(failure);
-      }
-
-      // Called by Swift for things nobody asked for: tabs changing, pages
-      // loading. One listener throwing must not stop the others.
-      function dispatch(message) {
-        if (!message) { return; }
-        for (var i = 0; i < listeners.length; i = i + 1) {
-          try {
-            listeners[i](message.event, message.payload);
-          } catch (error) {
-            if (window.console && window.console.error) {
-              window.console.error("Oriel: an event listener threw.", error);
-            }
-          }
-        }
-      }
-
-      window.__orielBridge = {
-        host: "ios",
-        surface: window.__orielSurface || "page",
-        send: send,
-        on: function (listener) {
-          if (typeof listener !== "function") { return function () {}; }
-          listeners.push(listener);
-          return function () {
-            var index = listeners.indexOf(listener);
-            if (index >= 0) { listeners.splice(index, 1); }
-          };
-        }
-      };
-
-      window.__oriel_bridge_settle = settle;
-      window.__oriel_bridge_event = dispatch;
-    })();
-    """#
 
     private static let blankPageHTML: String = #"""
     <!doctype html>

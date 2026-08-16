@@ -138,18 +138,27 @@ struct BridgeReply {
     }
 
     /// The three arguments of `window.__orielReply(id, ok, value)`, as one JSON
-    /// array. Sent that way, and applied, so a value that is an array, an
-    /// object, a string or null all cross without a special case — and without
-    /// needing JSONSerialization's fragment option.
+    /// array. Sent that way, and `apply`d, so a value that is an array, an
+    /// object, a string or null all cross without a special case here — and
+    /// without needing JSONSerialization's fragment option.
+    ///
+    /// The third argument is the full `{ ok, value }` envelope rather than the
+    /// bare value, which is what `test/ios-bridge.test.js` demonstrates as
+    /// "exactly what Swift does". `unwrap` on the other side peels it. Sending
+    /// the bare value would work for everything this shell returns today and
+    /// then quietly mangle the first payload that happened to have its own
+    /// `value` or `ok` key.
     func callArguments() -> [Any] {
         if ok {
-            if let value = value {
-                return [id, true, value]
-            }
-            return [id, true, NSNull()]
+            let envelope: [String: Any] = ["ok": true, "value": value ?? NSNull()]
+            return [id, true, envelope]
         }
 
+        // Read by `toError` in hosts/ios/bridge.js: `error` is the message, and
+        // `unsupported` is what makes "not built yet" a missing capability
+        // rather than a bug in the skin. `code` is extra, and ignored there.
         let payload: [String: Any] = [
+            "ok": false,
             "error": errorMessage ?? "The browser refused the request.",
             "code": errorCode ?? "error",
             "unsupported": isUnsupported
