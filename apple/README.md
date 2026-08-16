@@ -82,31 +82,41 @@ The message handler is named `oriel`, in the page world, on every surface.
 page  -> Swift   window.webkit.messageHandlers.oriel.postMessage(
                    { id, namespace, method, args })
 
-Swift -> page    window.__oriel_bridge_settle({ id, ok: true,  value })
-                 window.__oriel_bridge_settle({ id, ok: false, error: { code, message } })
-                 window.__oriel_bridge_event({ event, payload })
+Swift -> page    window.__orielReply(id, true,  { ok: true, value })
+                 window.__orielReply(id, false, { error, unsupported, code })
+
+events           window.__oriel.dispatch(channel, data)
 ```
 
-Replies come back through `evaluateJavaScript` and are matched by `id`, rather
-than through `WKScriptMessageHandlerWithReply`. Two reasons: registering the
-reply protocol needs a content-world API whose signature cannot be checked on a
-machine with no Xcode, and a reply handler cannot push the events the chrome
-document needs anyway. One mechanism, both directions.
+**The JavaScript half already exists and owns this format.** `hosts/ios/bridge.js`
+was written first, is merged, and has tests pinning it; the Swift is written
+against it, not the other way round. Two details that are easy to get subtly
+wrong and impossible to see failing:
 
-A small ES5 bootstrap in `WebViewFactory.bootstrapSource` owns the JavaScript
-half. It is injected before the engine and defines:
+- **`id` is a number.** `createBridge` keys a `Map` with `nextId++`. Echo `"3"`
+  instead of `3` and the promise hangs until its ten-second timeout.
+- **`args` is positional**, an array, not a named object. `tabs.open(url, opts)`
+  arrives as `[url, opts]`.
 
-```js
-window.__orielBridge.send(namespace, method, args)  // -> Promise
-window.__orielBridge.on(function (event, payload) {})
-window.__orielBridge.host                           // "ios"
-window.__orielSurface                               // "page" | "chrome"
-```
+Swift sends the three arguments as one JSON array and `apply`s them, so an
+object, an array, a string or null all cross without a special case.
+
+Replies come back through `evaluateJavaScript` rather than through
+`WKScriptMessageHandlerWithReply`. Three reasons: registering the reply protocol
+needs a content-world API whose signature cannot be checked on a machine with no
+Xcode; a reply handler cannot push the events the chrome document needs anyway;
+and `hosts/ios/bridge.js` installs `__orielReply` unconditionally and picks its
+path at run time, so taking the older one costs nothing there.
 
 **Every command is answered**, including ones this shell has not built. An
-unimplemented call resolves to `{ ok: false, error: { code: "unsupported" } }`
-so the engine can degrade; a dropped reply would leave a promise pending
-forever, which reads as slowness rather than as a bug.
+unimplemented call comes back with `unsupported: true`, which the engine turns
+into a `HostUnsupportedError` — a *missing capability*, distinct from a bug in
+the skin. A dropped reply would leave a promise pending until it times out,
+which reads as slowness rather than as a bug.
+
+On the first load of each surface, Swift calls `__oriel.ping()` and logs the
+answer. "The bridge is broken" and "the user script never ran" look identical on
+a device and are otherwise very hard to separate from a bug report.
 
 ### Implemented so far
 
@@ -134,9 +144,20 @@ returns `unsupported` today. Nothing is stubbed silently.
   lets touches through to the page. `BrowserView.chromeHeight`.
 - **New tabs load a blank document**, not a new-tab page. Waiting on
   `oriel.chrome.newTab`.
-- `window.__orielBridge` is an ordinary property, so a hostile page could
-  replace it. It only reaches capability this browser already grants that page,
-  but the eventual answer is a non-writable definition.
+- **`browser/chrome/chrome.html` will not work from the bundle as it stands**,
+  and neither problem is in `apple/`:
+  - it loads `chrome.js` with `type="module"`, and WKWebView blocks ES module
+    loading over `file://`. The bundle esbuild emits is an IIFE, so dropping
+    `type="module"` is enough.
+  - it links `../ui/theme.css`, but `IOS_COPY` in `scripts/build.mjs` flattens
+    `browser/ui/theme.css` to the root of `dist/ios/`, so the path resolves
+    above the bundle's `Web/` directory and outside the granted read access.
+- **The engine claims every capability.** `boot()` in `hosts/ios/main.js` calls
+  `createIosHost(bridge)` with no capability list, so it defaults to all of
+  `HOST_PROFILES.ios` while most of them answer `unsupported`. Its own comment
+  says the list should come from the native side; there is no seam for Swift to
+  pass one yet. Until there is, `oriel.can()` over-promises and skins find out
+  by catching `HostUnsupportedError`.
 
 ## Compile status
 
