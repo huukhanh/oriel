@@ -7,15 +7,15 @@
  * failure mode when they drift is a skin that works on one browser and throws
  * on another.
  *
- * @module content/oriel-api
+ * @module runtime/oriel-api
  */
 
-import { PAGE } from "../shared/protocol.js";
+import { PAGE } from "../../hosts/extension/shared/protocol.js";
 import { applyOps } from "../core/domops.js";
 
 /**
  * @param {object} spec
- * @param {import("../shared/protocol.js").AppliedSkin} spec.skin
+ * @param {import("../../hosts/extension/shared/protocol.js").AppliedSkin} spec.skin
  * @param {(type: string, payload: object) => Promise<any>} spec.send
  * @param {(text: string) => {remove(): void}} spec.addSheet
  */

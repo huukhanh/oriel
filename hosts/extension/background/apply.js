@@ -10,8 +10,8 @@
  */
 
 import { api, call, has } from "../shared/api.js";
-import { matchesTargets } from "../core/target.js";
-import { resolveForPage } from "../core/skin.js";
+import { matchesTargets } from "../../../engine/core/target.js";
+import { resolveForPage } from "../../../engine/core/skin.js";
 import { readIndex, readSkins, readSettings } from "./store.js";
 
 /**
@@ -151,7 +151,7 @@ export function watchNavigation() {
 
     // A single-page app changing route. The content script cannot see the
     // page's own `pushState` — separate worlds — so this is the fast path for
-    // telling it, and its poll is the slow one. See content/main.js.
+    // telling it, and its poll is the slow one. See runtime/main.js.
     if (has("webNavigation", "onHistoryStateUpdated")) {
         api.webNavigation.onHistoryStateUpdated.addListener(async (details) => {
             if (!isSkinnable(details.url) || details.tabId === undefined) return;

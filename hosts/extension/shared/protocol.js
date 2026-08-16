@@ -117,7 +117,7 @@ export const EVENT = {
  * @typedef {object} ImportReply
  * @property {boolean} ok
  * @property {SkinSummary} [summary]
- * @property {import("../core/types.js").SkinError[]} errors
+ * @property {import("../../../engine/core/types.js").SkinError[]} errors
  * @property {string[]} warnings
  * @property {string} [tried]     Which candidate URL actually answered.
  */
@@ -138,7 +138,7 @@ export const EVENT = {
  * @property {number} varCount
  * @property {string} [updateURL]
  * @property {string} [homepageURL]
- * @property {import("../core/types.js").Source} source
+ * @property {import("../../../engine/core/types.js").Source} source
  * @property {string[]} warnings
  */
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isUserScript, parseUserScript } from "../extension/src/core/userscript.js";
+import { isUserScript, parseUserScript } from "../engine/core/userscript.js";
 
 // Assembles "// ==UserScript== ... // ==/UserScript==" from a list of
 // "@key value" lines, so individual tests only state what they're testing.

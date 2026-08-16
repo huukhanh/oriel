@@ -7,11 +7,11 @@
  * because each step is more expensive and more likely to fail than the one
  * before it, and a skin whose script throws should still have restyled the page.
  *
- * @module content/main
+ * @module runtime/main
  */
 
-import { api, sendMessage } from "../shared/api.js";
-import { PAGE, EVENT } from "../shared/protocol.js";
+import { api, sendMessage } from "../../hosts/extension/shared/api.js";
+import { PAGE, EVENT } from "../../hosts/extension/shared/protocol.js";
 import { createRunner } from "../core/domops.js";
 import { createStyleHost } from "./styles.js";
 import { createOrielApi } from "./oriel-api.js";

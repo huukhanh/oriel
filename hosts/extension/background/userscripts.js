@@ -15,9 +15,9 @@
  */
 
 import { api, call } from "../shared/api.js";
-import { wrapForUserScriptWorld, registrationId, parseRegistrationId } from "../core/wrapper.js";
-import { originPatterns } from "../core/target.js";
-import { unionTargets, withDefaults } from "../core/skin.js";
+import { wrapForUserScriptWorld, registrationId, parseRegistrationId } from "../../../engine/core/wrapper.js";
+import { originPatterns } from "../../../engine/core/target.js";
+import { unionTargets, withDefaults } from "../../../engine/core/skin.js";
 import { readIndex, readSkins, readSettings, log } from "./store.js";
 
 let configured = false;

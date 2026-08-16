@@ -15,7 +15,7 @@ import {
     renderSettings,
     renderEmpty,
     PREVIEW_DEBOUNCE_MS
-} from "../extension/src/ui/views.js";
+} from "../browser/ui/views.js";
 
 /* ------------------------------------------------------------------ setup */
 

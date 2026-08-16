@@ -18,8 +18,8 @@ import * as caps from "./caps.js";
 import * as install from "./install.js";
 import * as updates from "./updates.js";
 import { syncUserScripts } from "./userscripts.js";
-import { summarize, exportSkin } from "../core/skin.js";
-import { stringifyUserCss } from "../core/usercss.js";
+import { summarize, exportSkin } from "../../../engine/core/skin.js";
+import { stringifyUserCss } from "../../../engine/core/usercss.js";
 
 const handlers = {
     // --- page ---------------------------------------------------------------
@@ -125,7 +125,7 @@ const handlers = {
     },
 
     async [UI.PREVIEW_URL](payload) {
-        const { resolveLocator } = await import("../core/source.js");
+        const { resolveLocator } = await import("../../../engine/core/source.js");
         const resolved = resolveLocator(payload.locator);
         return {
             ok: resolved.candidates.length > 0,
@@ -189,7 +189,7 @@ const handlers = {
 
     async [UI.FOR_SITE](payload) {
         const index = await store.readIndex();
-        const { matchesTargets } = await import("../core/target.js");
+        const { matchesTargets } = await import("../../../engine/core/target.js");
         const skinnable = apply.isSkinnable(payload.url);
         const matches = [];
         const others = [];

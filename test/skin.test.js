@@ -11,8 +11,8 @@ import {
     exportSkin,
     deriveId,
     normalizeId
-} from "../extension/src/core/skin.js";
-import { stringifyUserCss } from "../extension/src/core/usercss.js";
+} from "../engine/core/skin.js";
+import { stringifyUserCss } from "../engine/core/usercss.js";
 
 /**
  * Four input formats reduce to one `Skin` here, and nothing downstream knows

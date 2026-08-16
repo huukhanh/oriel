@@ -16,7 +16,7 @@ import {
     humanURL,
     SKIN_FILENAMES,
     isSkinFilename
-} from "../extension/src/core/source.js";
+} from "../engine/core/source.js";
 
 // --- looksLikeLocator --------------------------------------------------------
 

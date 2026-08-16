@@ -1,7 +1,7 @@
 /**
- * The single seam between this CLI and extension/src/core/. Everything else
+ * The single seam between this CLI and engine/core/. Everything else
  * in this tool calls `loadCore()` and uses the result — never imports
- * extension/src/core/* directly — so that when those modules land (or
+ * engine/core/* directly — so that when those modules land (or
  * change), nothing outside this file has to.
  *
  * Each of the five modules is imported dynamically and independently. One
@@ -19,7 +19,7 @@ import * as fallback from "./core-fallback.js";
 import { log } from "./log.js";
 
 const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
-export const EXTENSION_CORE_DIR = path.join(REPO_ROOT, "extension/src/core");
+export const EXTENSION_CORE_DIR = path.join(REPO_ROOT, "engine/core");
 
 const MODULES = {
     target: ["compileTargets", "ruleFromString", "describeTargets"],
@@ -33,7 +33,7 @@ let warnedOnce = false;
 function warnFallback(name, reason) {
     if (warnedOnce) return;
     warnedOnce = true;
-    log.warn(`extension/src/core/${name}.js not usable yet (${reason}) — using oriel-cli's built-in validator. Re-run once it lands.`);
+    log.warn(`engine/core/${name}.js not usable yet (${reason}) — using oriel-cli's built-in validator. Re-run once it lands.`);
 }
 
 async function tryLoad(name, exports) {

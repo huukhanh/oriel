@@ -7,7 +7,7 @@ import {
     cssVariableBlock,
     substituteCss,
     interpolate
-} from "../extension/src/core/vars.js";
+} from "../engine/core/vars.js";
 
 describe("parseVarDeclaration - text", () => {
     it("parses a quoted default", () => {

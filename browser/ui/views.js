@@ -251,7 +251,7 @@ function logList(h, entries, skinsById, { limit } = {}) {
 }
 
 /**
- * @param {{skins: import("../shared/protocol.js").SkinSummary[], filter?: string, onToggle?: Function, onOpen?: Function, onReorder?: Function}} props
+ * @param {{skins: import("../../hosts/extension/shared/protocol.js").SkinSummary[], filter?: string, onToggle?: Function, onOpen?: Function, onReorder?: Function}} props
  * @param {Document} document
  * @returns {HTMLElement}
  */
@@ -314,7 +314,7 @@ export function renderSkinList({ skins = [], filter = "", onToggle, onOpen, onRe
 }
 
 /**
- * @param {{installed: import("../core/types.js").InstalledSkin, caps: object, onSave?: Function, onValues?: Function, onRemove?: Function, onUpdate?: Function}} props
+ * @param {{installed: import("../../engine/core/types.js").InstalledSkin, caps: object, onSave?: Function, onValues?: Function, onRemove?: Function, onUpdate?: Function}} props
  * @param {Document} document
  * @returns {HTMLElement}
  */

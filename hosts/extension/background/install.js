@@ -14,8 +14,8 @@
  * @module background/install
  */
 
-import { resolveLocator, deriveUpdateURL, isSkinFilename, SKIN_FILENAMES } from "../core/source.js";
-import { skinFromText, skinFromBundle, sniffFormat } from "../core/skin.js";
+import { resolveLocator, deriveUpdateURL, isSkinFilename, SKIN_FILENAMES } from "../../../engine/core/source.js";
+import { skinFromText, skinFromBundle, sniffFormat } from "../../../engine/core/skin.js";
 import { putSkin, readSkin, log } from "./store.js";
 
 /** A skin bigger than this is a mistake or an attack; either way it does not belong in phone storage. */
@@ -26,7 +26,7 @@ const MAX_FETCHES = 24;
 
 /**
  * @param {string} text
- * @param {{name?: string, match?: string, source?: import("../core/types.js").Source}} [options]
+ * @param {{name?: string, match?: string, source?: import("../../../engine/core/types.js").Source}} [options]
  * @returns {Promise<import("../shared/protocol.js").ImportReply>}
  */
 export async function importFromText(text, options = {}) {
@@ -142,7 +142,7 @@ async function finishInstall(parsed, source, text, state) {
     parsed.skin.source = source;
     const installed = await putSkin(parsed.skin, state);
     log({ skinId: parsed.skin.id, level: "info", message: `Installed ${parsed.skin.name} ${parsed.skin.version}` });
-    const { summarize } = await import("../core/skin.js");
+    const { summarize } = await import("../../../engine/core/skin.js");
     return { ok: true, summary: summarize(installed), errors: [], warnings: parsed.warnings };
 }
 

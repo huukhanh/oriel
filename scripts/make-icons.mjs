@@ -147,10 +147,10 @@ function write(path, size, opaque = false) {
 }
 
 const written = [
-    write(join(root, "extension", "icons", "icon-16.png"), 16),
-    write(join(root, "extension", "icons", "icon-32.png"), 32),
-    write(join(root, "extension", "icons", "icon-48.png"), 48),
-    write(join(root, "extension", "icons", "icon-128.png"), 128),
+    write(join(root, "assets", "icons", "icon-16.png"), 16),
+    write(join(root, "assets", "icons", "icon-32.png"), 32),
+    write(join(root, "assets", "icons", "icon-48.png"), 48),
+    write(join(root, "assets", "icons", "icon-128.png"), 128),
     write(join(root, "apple", "Sources", "Assets.xcassets", "AppIcon.appiconset", "icon-1024.png"), 1024, true)
 ];
 

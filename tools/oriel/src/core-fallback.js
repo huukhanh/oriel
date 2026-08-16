@@ -1,5 +1,5 @@
 /**
- * Minimal stand-ins for extension/src/core/*, used only when those modules
+ * Minimal stand-ins for engine/core/*, used only when those modules
  * are missing or fail to import — see core.js. Kept honest against
  * docs/SKIN-FORMAT.md, but this is not the extension's own validator and
  * should never be the last word once the real modules exist.
@@ -157,7 +157,7 @@ const OP_SPECS = {
 };
 
 /**
- * Field paths are `dom[i]...`, matching the shape `extension/src/core/domops.js`
+ * Field paths are `dom[i]...`, matching the shape `engine/core/domops.js`
  * uses — so callers do not need to know which one produced the errors.
  *
  * @returns {{ops: object[], errors: {message:string, field:string}[]}}
@@ -207,7 +207,7 @@ export function validateOps(ops) {
 
 /**
  * Field paths are `vars[i]` with the path folded into the message text too —
- * matching `extension/src/core/vars.js`'s convention, so callers don't need
+ * matching `engine/core/vars.js`'s convention, so callers don't need
  * to know which one produced an error. Unlike that module, this one does not
  * validate a default against its own min/max/options — see
  * `oriel-cli/src/skin-loader.js`'s `checkVarBounds`, which does that as a
@@ -259,7 +259,7 @@ export function defaultValues(vars) {
 
 // ---- usercss ---------------------------------------------------------
 //
-// Shape matches extension/src/core/usercss.js's parseUserCss exactly —
+// Shape matches engine/core/usercss.js's parseUserCss exactly —
 // {meta, name, version, ..., vars, sections: [{rules, css}], targets,
 // dom, js, runAt, allFrames, warnings, errors} — so skin-loader.js has one
 // contract regardless of which produced it. This is a reduced parser:
@@ -411,7 +411,7 @@ function emptyResult(warnings, errors) {
 
 /**
  * Never throws — a parse problem is an entry in `errors`, with a line number
- * where one is known. Shape matches `extension/src/core/usercss.js`'s
+ * where one is known. Shape matches `engine/core/usercss.js`'s
  * `parseUserCss` (see the module comment above); `@oriel-match`,
  * `@oriel-exclude`, `@oriel-dom` and `@oriel-js` are not implemented here, so
  * `targets.include/exclude` and `dom`/`js` always come back empty.

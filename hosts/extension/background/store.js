@@ -19,7 +19,7 @@
 
 import { storage } from "../shared/api.js";
 import { KEY, DEFAULT_SETTINGS } from "../shared/protocol.js";
-import { summarize, unionTargets } from "../core/skin.js";
+import { summarize, unionTargets } from "../../../engine/core/skin.js";
 
 /**
  * The index is read on every page load, so it is cached in memory and
@@ -32,7 +32,7 @@ let cachedIndex = null;
 
 /**
  * @typedef {import("../shared/protocol.js").SkinSummary & {
- *   rules: import("../core/types.js").Targets,
+ *   rules: import("../../../engine/core/types.js").Targets,
  *   runAt: string,
  *   allFrames: boolean
  * }} IndexEntry
@@ -55,7 +55,7 @@ export function invalidate() {
     cachedIndex = null;
 }
 
-/** @returns {Promise<import("../core/types.js").InstalledSkin|null>} */
+/** @returns {Promise<import("../../../engine/core/types.js").InstalledSkin|null>} */
 export async function readSkin(id) {
     const data = await storage.get([KEY.body(id), KEY.values(id)]);
     const skin = data[KEY.body(id)];
@@ -99,7 +99,7 @@ export async function readSkins(ids) {
  * tuning a skin's colours should not lose them because the author shipped a
  * patch release.
  *
- * @param {import("../core/types.js").Skin} skin
+ * @param {import("../../../engine/core/types.js").Skin} skin
  * @param {{enabled?: boolean, values?: object}} [state]
  */
 export async function putSkin(skin, state = {}) {

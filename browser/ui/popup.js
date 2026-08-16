@@ -9,7 +9,7 @@
 import { createRpc } from "./rpc.js";
 import { renderPopup, renderEmpty } from "./views.js";
 import { clear } from "./dom.js";
-import { UI, EVENT, DEFAULT_SETTINGS } from "../shared/protocol.js";
+import { UI, EVENT, DEFAULT_SETTINGS } from "../../hosts/extension/shared/protocol.js";
 
 const api = globalThis.chrome || globalThis.browser || {};
 const rpc = createRpc(api.runtime || { sendMessage: () => Promise.reject(new Error("No extension runtime")) });

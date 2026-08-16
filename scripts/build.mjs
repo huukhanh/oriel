@@ -14,10 +14,9 @@ import { cp, mkdir, rm, writeFile, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { manifestFor, TARGETS, VERSION } from "../extension/manifest.config.js";
+import { manifestFor, TARGETS, VERSION } from "../hosts/extension/manifest.config.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const src = join(root, "extension", "src");
 const dist = join(root, "dist");
 
 const args = process.argv.slice(2);
@@ -33,27 +32,26 @@ const watch = flag("watch");
 
 /** Entry points, and the filename each must land on — the HTML refers to these by name. */
 const ENTRIES = [
-    { in: join(src, "background", "main.js"), out: "background" },
-    { in: join(src, "content", "main.js"), out: "content" },
-    { in: join(src, "ui", "popup.js"), out: "popup" },
-    { in: join(src, "ui", "manager.js"), out: "manager" }
+    { in: join(root, "hosts", "extension", "background", "main.js"), out: "background" },
+    { in: join(root, "engine", "runtime", "main.js"), out: "content" },
+    { in: join(root, "browser", "ui", "popup.js"), out: "popup" },
+    { in: join(root, "browser", "ui", "manager.js"), out: "manager" }
 ];
 
 /** Copied verbatim, path preserved relative to the second element. */
 const COPY = [
-    [join(src, "ui"), ["popup.html", "manager.html", "theme.css"]],
-    [join(root, "extension", "icons"), null]
+    [join(root, "browser", "ui"), ["popup.html", "manager.html", "theme.css"], ""],
+    [join(root, "assets", "icons"), null, "icons"]
 ];
 
 async function copyStatic(outDir) {
-    for (const [dir, names] of COPY) {
+    for (const [dir, names, sub] of COPY) {
         if (!existsSync(dir)) continue;
         const list = names ?? (await readdir(dir));
-        const sub = relative(join(root, "extension"), dir);
         for (const name of list) {
             const from = join(dir, name);
             if (!existsSync(from)) continue;
-            const to = sub === "src/ui" ? join(outDir, name) : join(outDir, sub, name);
+            const to = sub ? join(outDir, sub, name) : join(outDir, name);
             await mkdir(dirname(to), { recursive: true });
             await cp(from, to, { recursive: true });
         }

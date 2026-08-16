@@ -18,16 +18,16 @@ lint clean · 724 unit tests · 24 end-to-end tests in real browsers
 
 | Piece | State |
 |---|---|
-| `core/target.js` | Six rule kinds, Chrome match patterns. 235 tests, mutation-checked. |
-| `core/domops.js` | 15 layout operations, each with an inverse. 81 tests. |
-| `core/usercss.js`, `core/vars.js` | Stylus-compatible parsing and variables. 93 tests. |
-| `core/userscript.js` | Tampermonkey/Violentmonkey metadata. 52 tests. |
-| `core/source.js`, `core/version.js` | GitHub link resolution, loose-semver comparison. 84 tests. |
-| `core/skin.js` | The funnel: four input formats in, one `Skin` out. 41 tests. |
-| `core/wrapper.js` | Generated source for the user-script world. 15 tests. |
-| `background/*` | Store, capability probe, install, updates, apply, router. |
-| `content/*` | The engine: stylesheets, the `oriel` API, single-page re-entry. |
-| `ui/*` | Popup and manager, as pure render functions. 73 tests. |
+| `engine/core/target.js` | Six rule kinds, Chrome match patterns. 235 tests, mutation-checked. |
+| `engine/core/domops.js` | 15 layout operations, each with an inverse. 81 tests. |
+| `engine/core/usercss.js`, `engine/core/vars.js` | Stylus-compatible parsing and variables. 93 tests. |
+| `engine/core/userscript.js` | Tampermonkey/Violentmonkey metadata. 52 tests. |
+| `engine/core/source.js`, `engine/core/version.js` | GitHub link resolution, loose-semver comparison. 84 tests. |
+| `engine/core/skin.js` | The funnel: four input formats in, one `Skin` out. 41 tests. |
+| `engine/core/wrapper.js` | Generated source for the user-script world. 15 tests. |
+| `hosts/extension/background/*` | Store, capability probe, install, updates, apply, router. |
+| `engine/runtime/*` | The engine: stylesheets, the `oriel` API, single-page re-entry. |
+| `browser/ui/*` | Popup and manager, as pure render functions. 73 tests. |
 | `tools/oriel` | The authoring CLI. 26 tests. |
 | `skins/` | Three worked examples, installed by the e2e suite. |
 | `apple/` | Container app and Safari Web Extension target, XcodeGen. **Compiles green in CI**; never run on a device. |

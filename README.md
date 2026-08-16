@@ -110,8 +110,14 @@ about where the evidence stops.
 ## Repository layout
 
 ```
-extension/   The extension. `src/core/` is pure logic with no browser APIs — that is
-             what makes most of this provable without a browser at all.
+engine/      The skin engine. `core/` is pure logic with no browser APIs — that is
+             what makes most of this provable without a browser at all. `runtime/`
+             applies skins to a document and exposes `oriel` to skin JS.
+hosts/       Where a runtime plugs in. `extension/` is a WebExtension shell, kept
+             as a test host so the engine can be exercised in a real browser here.
+browser/     The browser's own interface — itself skinnable. `ui/` is the popup
+             and manager.
+assets/      Icons, shared across hosts.
 tools/oriel/ The authoring CLI: scaffold, live-reload dev server, validate, bundle.
 skins/       Worked examples, and the gallery format.
 test/        Unit tests.

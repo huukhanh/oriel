@@ -23,10 +23,10 @@
  * stop matching must come off cleanly, and `removeCSS` only works when handed
  * byte-identical text to what was inserted — hence the sheet text is kept.
  *
- * @module content/styles
+ * @module runtime/styles
  */
 
-import { PAGE } from "../shared/protocol.js";
+import { PAGE } from "../../hosts/extension/shared/protocol.js";
 
 /**
  * Constructed stylesheets need `CSSStyleSheet` to be constructible and

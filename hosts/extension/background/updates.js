@@ -13,8 +13,8 @@
  * @module background/updates
  */
 
-import { isNewer } from "../core/version.js";
-import { sniffFormat } from "../core/skin.js";
+import { isNewer } from "../../../engine/core/version.js";
+import { sniffFormat } from "../../../engine/core/skin.js";
 import { readIndex, readSkin, readSettings, log } from "./store.js";
 import { importFromLocator } from "./install.js";
 

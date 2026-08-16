@@ -73,7 +73,7 @@ function currentValue(variable, values) {
 let formSeq = 0;
 
 /**
- * @param {{vars: import("../core/types.js").Var[], values?: Record<string, string|number>, onChange?: (key: string, value: string|number) => void}} props
+ * @param {{vars: import("../../engine/core/types.js").Var[], values?: Record<string, string|number>, onChange?: (key: string, value: string|number) => void}} props
  * @param {Document} document
  * @returns {HTMLElement} a `<form>`; pass it to {@link readValues} to read it back.
  */

@@ -86,7 +86,7 @@ update once installed — this is the check that catches it before you push.
 ## How validation works
 
 This tool never reimplements Oriel's own rules. `src/core.js` dynamically
-imports `extension/src/core/{target,usercss,domops,vars,types}.js` — the
+imports `engine/core/{target,usercss,domops,vars,types}.js` — the
 same modules the extension ships — and only falls back to its own minimal
 copy (`src/core-fallback.js`) for whichever of those aren't written yet, with
 a one-time warning saying so. As each one lands, this tool starts validating
