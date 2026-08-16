@@ -5,11 +5,18 @@
 # which is every machine this project is developed on. This file is the source
 # of truth; regenerate rather than edit.
 #
-# There is very little Swift here on purpose. A Safari Web Extension is a web
-# extension: everything Oriel does lives in `dist/safari/`, which the build
-# copies into the extension bundle verbatim. The Swift is a container app whose
-# whole job is to exist so iOS has something to install, and a handler that
-# exists because the extension point requires a principal class.
+# Two targets:
+#
+#   Oriel           The browser. A window, one WKWebView per tab, a second
+#                   WKWebView holding the browser's own interface, and a message
+#                   bridge between them. The interface — tab strip, address bar,
+#                   toolbar — is HTML from `dist/ios/`, not SwiftUI, because a
+#                   skin has to be able to restyle it and because Swift is the
+#                   one part of this project nobody in its loop can test.
+#   OrielExtension  The Safari Web Extension, kept as a test host and as a
+#                   convenience for desktop authoring. Unchanged.
+#
+# See docs/decisions/001-browser-not-extension.md.
 
 name: Oriel
 
@@ -25,7 +32,7 @@ options:
   createIntermediateGroups: true
   # Nothing here is concurrent. Swift 6 strict checking would be a source of
   # build failures on a machine we cannot reproduce, in exchange for safety
-  # this target has no use for.
+  # these targets have no use for.
   defaultConfig: Debug
 
 settings:
@@ -42,18 +49,49 @@ targets:
     type: application
     platform: iOS
     sources:
-      - path: Sources/App
+      - path: Sources/Browser
       - path: Sources/Assets.xcassets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.huukhanh.Oriel
-        INFOPLIST_FILE: Sources/App/Info.plist
+        INFOPLIST_FILE: Sources/Browser/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: NO
     dependencies:
       - target: OrielExtension
         embed: true
         codeSign: true
+    postBuildScripts:
+      - name: Copy the browser's web payload
+        # `dist/ios/` holds the two documents the Swift loads by name: the skin
+        # engine, installed into every page as a document-start user script,
+        # and the browser's own interface. They are copied into `Web/` inside
+        # the app bundle, which is the `subdirectory:` argument in
+        # WebViewFactory. Change one and change the other.
+        #
+        # Copied rather than referenced so `pnpm build` output and the Xcode
+        # build stay independent; the only coupling is this path.
+        script: |
+          set -e
+          SOURCE="${SRCROOT}/../dist/ios"
+          if [ ! -d "${SOURCE}" ]; then
+            echo "error: ${SOURCE} does not exist. Run 'pnpm build' at the repo root first."
+            exit 1
+          fi
+          if [ ! -f "${SOURCE}/engine.js" ]; then
+            echo "error: ${SOURCE}/engine.js is missing. Run 'pnpm build' at the repo root first."
+            exit 1
+          fi
+          if [ ! -f "${SOURCE}/chrome.html" ]; then
+            echo "error: ${SOURCE}/chrome.html is missing. Run 'pnpm build' at the repo root first."
+            exit 1
+          fi
+          DEST="${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Web"
+          rm -rf "${DEST}"
+          mkdir -p "${DEST}"
+          cp -R "${SOURCE}"/. "${DEST}"/
+          echo "copied the browser's web payload into ${DEST}"
+        basedOnDependencyAnalysis: false
 
   OrielExtension:
     type: app-extension

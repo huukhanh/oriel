@@ -26,7 +26,14 @@ const value = (name, fallback) => {
     return i === -1 ? fallback : args[i + 1];
 };
 
-const targets = value("target", "all") === "all" ? TARGETS : [value("target")];
+/**
+ * `ios` is not a WebExtension target and has no manifest. It emits the single
+ * script the browser's Swift shell installs as a document-start user script,
+ * plus the documents the browser loads for its own interface. Kept in the same
+ * build so the engine cannot drift between the two shells.
+ */
+const ALL_TARGETS = [...TARGETS, "ios"];
+const targets = value("target", "all") === "all" ? ALL_TARGETS : [value("target")];
 const minify = flag("minify");
 const watch = flag("watch");
 
@@ -44,8 +51,8 @@ const COPY = [
     [join(root, "assets", "icons"), null, "icons"]
 ];
 
-async function copyStatic(outDir) {
-    for (const [dir, names, sub] of COPY) {
+async function copyStatic(outDir, entries = COPY) {
+    for (const [dir, names, sub] of entries) {
         if (!existsSync(dir)) continue;
         const list = names ?? (await readdir(dir));
         for (const name of list) {
@@ -58,13 +65,38 @@ async function copyStatic(outDir) {
     }
 }
 
+/** The browser: one injected script, and the chrome's own documents. */
+const IOS_ENTRIES = [
+    { in: join(root, "hosts", "ios", "main.js"), out: "engine" },
+    { in: join(root, "browser", "chrome", "chrome.js"), out: "chrome" },
+    { in: join(root, "browser", "ui", "manager.js"), out: "manager" }
+];
+
+const IOS_COPY = [
+    [join(root, "browser", "chrome"), ["chrome.html", "chrome.css"], ""],
+    [join(root, "browser", "ui"), ["manager.html", "theme.css"], ""],
+    [join(root, "assets", "icons"), null, "icons"]
+];
+
 async function buildTarget(target) {
     const outDir = join(dist, target);
     await rm(outDir, { recursive: true, force: true });
     await mkdir(outDir, { recursive: true });
 
+    const ios = target === "ios";
+    const wanted = ios ? IOS_ENTRIES : ENTRIES;
+    const entries = wanted.filter((entry) => existsSync(entry.in));
+    // Skipping a missing entry keeps the build usable while a piece is still
+    // being written, but silently is how a renamed entry point becomes an
+    // extension that installs and does nothing.
+    for (const entry of wanted) {
+        if (!existsSync(entry.in)) {
+            process.stderr.write(`build: ${target}: no ${relative(root, entry.in)}, skipping "${entry.out}"\n`);
+        }
+    }
+
     const options = {
-        entryPoints: ENTRIES.map((e) => ({ in: e.in, out: e.out })),
+        entryPoints: entries.map((e) => ({ in: e.in, out: e.out })),
         outdir: outDir,
         bundle: true,
         format: "iife",
@@ -86,11 +118,13 @@ async function buildTarget(target) {
         await build(options);
     }
 
-    await copyStatic(outDir);
-    await writeFile(
-        join(outDir, "manifest.json"),
-        JSON.stringify(manifestFor(target), null, 2) + "\n"
-    );
+    await copyStatic(outDir, ios ? IOS_COPY : COPY);
+    if (!ios) {
+        await writeFile(
+            join(outDir, "manifest.json"),
+            JSON.stringify(manifestFor(target), null, 2) + "\n"
+        );
+    }
 
     return outDir;
 }
@@ -125,6 +159,7 @@ for (const target of targets) {
 
 let failed = false;
 for (const [target, outDir] of built) {
+    if (target === "ios") continue; // no manifest to check
     for (const problem of await checkManifestFiles(outDir, target)) {
         process.stderr.write(`build: ${problem}\n`);
         failed = true;
