@@ -276,9 +276,12 @@ export function renderToolbar({ canGoBack = false, canGoForward = false, tabCoun
     const toolbar = h("div.chrome-toolbar", { "data-chrome": "toolbar", role: "toolbar", "aria-label": "Browser" });
 
     const back = navButton(h, document, "back", "Back", !canGoBack);
-    back.addEventListener("click", () => fire("back"));
+    // Disabled must mean non-functional, not just visibly greyed out — a
+    // script-dispatched click bypasses a real browser's own input handling
+    // for a disabled control, so the guard has to live here too.
+    back.addEventListener("click", () => canGoBack && fire("back"));
     const forward = navButton(h, document, "forward", "Forward", !canGoForward);
-    forward.addEventListener("click", () => fire("forward"));
+    forward.addEventListener("click", () => canGoForward && fire("forward"));
     toolbar.append(back, forward);
 
     const slot = h("div.chrome-toolbar-slot", { "data-chrome": "toolbar-slot" });
