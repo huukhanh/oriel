@@ -16,7 +16,12 @@ name: Oriel
 options:
   bundleIdPrefix: io.github.huukhanh
   deploymentTarget:
-    iOS: "16.0"
+    # 16.4 rather than 16.0 for two reasons that both matter: Safari gained
+    # Manifest V3 support there, and constructed stylesheets — which are how
+    # Oriel gets CSS onto a page whose CSP forbids a <style> element — arrived
+    # in the same release. On 16.0 the extension would install and then fail on
+    # a large share of the sites worth reskinning.
+    iOS: "16.4"
   createIntermediateGroups: true
   # Nothing here is concurrent. Swift 6 strict checking would be a source of
   # build failures on a machine we cannot reproduce, in exchange for safety

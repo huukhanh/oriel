@@ -1,69 +1,65 @@
 # Where the rework stands
 
-Working branch: `feat/rework-extension`. Nothing has been merged to `main` yet —
-`main` is still the old iOS browser.
+Working branch: `feat/rework-extension`. `main` is still the old iOS browser.
 
 ## The change in direction
 
 Oriel was a scriptable iOS browser. It is now a **cross-browser extension that
 stores and applies skins** — packages that completely change a website's
 interface — installed by pasting source or by giving a GitHub link, and authored
-on a desktop with a CLI. The old `App/`, `Core/` and `web/` trees are deleted;
-`docs/SKIN-FORMAT.md` is the new contract and is normative.
+on a desktop with a CLI. The old `App/`, `Core/` and `web/` trees are gone.
+[`SKIN-FORMAT.md`](SKIN-FORMAT.md) is the contract and is normative.
 
-## Done and proven
+## Built and proven
+
+```
+lint clean · 724 unit tests · 24 end-to-end tests in real browsers
+```
 
 | Piece | State |
 |---|---|
-| `docs/SKIN-FORMAT.md` | The normative format spec. Written first; everything implements it. |
-| `core/target.js` | Targeting: 6 rule kinds, Chrome match patterns. **235 tests.** Mutation-checked. |
-| `core/domops.js` | 15 declarative DOM operations, each with an inverse for clean SPA teardown. **81 tests.** |
-| `core/userscript.js` | Tampermonkey/Violentmonkey metadata parser. **52 tests.** |
-| `core/skin.js` | The normalizer: four input formats in, one `Skin` out. |
-| `core/wrapper.js` | Source generation for the `userScripts` world. |
-| `shared/protocol.js` | The whole message vocabulary, in one file. |
-| `background/*` | Store, capability probe, install pipeline, update checks, apply, router. |
-| `content/*` | The engine: styles, the `oriel` API, SPA re-entry. |
-| `scripts/build.mjs` | Per-browser bundles into `dist/{chrome,firefox,safari}`. |
-| `e2e/harness.js` | Real Chromium with the extension loaded; real WebKit for the engine. |
-| CI | `.github/workflows/ci.yml` — lint, unit, build all targets, real-browser E2E. |
+| `core/target.js` | Six rule kinds, Chrome match patterns. 235 tests, mutation-checked. |
+| `core/domops.js` | 15 layout operations, each with an inverse. 81 tests. |
+| `core/usercss.js`, `core/vars.js` | Stylus-compatible parsing and variables. 93 tests. |
+| `core/userscript.js` | Tampermonkey/Violentmonkey metadata. 52 tests. |
+| `core/source.js`, `core/version.js` | GitHub link resolution, loose-semver comparison. 84 tests. |
+| `core/skin.js` | The funnel: four input formats in, one `Skin` out. 41 tests. |
+| `core/wrapper.js` | Generated source for the user-script world. 15 tests. |
+| `background/*` | Store, capability probe, install, updates, apply, router. |
+| `content/*` | The engine: stylesheets, the `oriel` API, single-page re-entry. |
+| `ui/*` | Popup and manager, as pure render functions. 73 tests. |
+| `tools/oriel` | The authoring CLI. 26 tests. |
+| `skins/` | Three worked examples, installed by the e2e suite. |
+| `apple/` | Container app and Safari Web Extension target, XcodeGen. **Never compiled.** |
+| CI | `ci.yml` on every push; `apple.yml` manual and tag-only. |
 
-**368 unit tests green, lint clean** at the time of writing.
+## What running it in real browsers changed
 
-## Two platform facts, measured rather than assumed
+Six things that would otherwise have shipped looking correct. They are the
+argument for the e2e suites existing at all:
 
-1. **Chromium blocks `eval` and `new Function` inside content scripts.** The
-   extension's own CSP applies there, independent of the page's. Verified with a
-   throwaway extension in real Chromium, on a plain page and on one with
-   `script-src 'self'`. So skin JavaScript has exactly two routes: the
-   `userScripts` API where it exists and is permitted, or direct evaluation in
-   the isolated world on engines that allow it. `background/caps.js` probes
-   which, and the UI says so.
-2. **`/*[[var]]*/` is Stylus's `uso` preprocessor, not `default`.** `default`
-   uses `var(--name)`. Oriel does both unconditionally, which is a superset of
-   the two modes and cannot mis-fire.
+1. **Chromium blocks `eval` in content scripts.** Skin JavaScript therefore has
+   a layered strategy and a capability probe, not one mechanism.
+2. **A `<style>` element is blocked by `style-src 'self'`;** a constructed
+   stylesheet is not. The fallback path was rewritten around that.
+3. **A content script cannot see the page's own `pushState`** — separate
+   worlds. Route changes need events, a background signal and a poll.
+4. **The early CSS push could never be undone,** because `removeCSS` matches on
+   exact text. Removed.
+5. **Adopted-sheet removal mistook its own sheet for the page's** and kept it
+   forever.
+6. A skin's stylesheet has to survive a document with **no root element yet**.
 
-## In flight
+## Left to do
 
-Four teammates were mid-task at the checkpoint. Their files may be partially
-present:
-
-- `core/vars.js` + `core/usercss.js` (+ tests) — the UserCSS parser and variable
-  system. **`core/skin.js` imports these; the build will not link without them.**
-- `core/source.js` + `core/version.js` (+ tests) — GitHub URL resolution and
-  version comparison. Also imported by `background/install.js` and `updates.js`.
-- `ui/*` — popup and manager, built against `shared/protocol.js`.
-- `tools/oriel/*` and `skins/*` — the authoring CLI and worked examples.
-
-## Next, in order
-
-1. **Land the four in-flight modules, then integrate.** `pnpm build` is the
-   first honest check that the graph links; `pnpm test:e2e` is the second.
-   `e2e/extension.e2e.test.js` is written and waiting.
-2. **The Apple half.** `apple/` does not exist yet: an iOS + macOS container app
-   with a Safari Web Extension target, expressed in an XcodeGen `project.yml`,
-   plus a CI job that produces an unsigned build. This is the only part that
-   cannot be verified here at all.
-3. **`docs/VERIFICATION.md` and `docs/SAFARI.md`.** Referenced by the README and
-   not yet written. The first says where the evidence stops; the second is the
-   install path for a phone.
+1. **A device test.** Nothing here can touch Safari, and the open question that
+   decides how much of the format works on iOS — whether Safari lets an
+   extension run code it downloaded — is one line in the Capabilities panel.
+   [`VERIFICATION.md`](VERIFICATION.md#what-a-device-test-is-for) lists what is
+   worth a build cycle.
+2. **`apple/` has never been compiled.** `apple.yml` is written and has never
+   run. Expect the first run to fail on something small.
+3. **Smaller gaps.** `oriel check <gallery-dir>` does not recognise an
+   `index.json`; there is no test for the background's storage layer; the
+   manager's editor is a textarea with a line number rather than anything
+   cleverer.
