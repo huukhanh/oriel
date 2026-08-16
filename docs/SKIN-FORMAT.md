@@ -139,8 +139,10 @@ are the two userscript forms.
   object `{ "kind": "domain", "value": "…" }` is explicit.
 - **`*.user.css`** — every `@-moz-document` section contributes its functions as
   include rules *for that section's CSS only*. A skin with three sections has
-  three separately-targeted stylesheets under one identity. A `@match` key in
-  the metadata block, if present, applies to the whole skin.
+  three separately-targeted stylesheets under one identity. An `@oriel-match`
+  key in the metadata block, if present, scopes the whole skin instead;
+  `@match`, `@exclude` and `@exclude-match` are accepted as aliases, because
+  that is what anyone who has written a userscript will reach for.
 - A skin with **no** include rules matches nothing and is reported as an error
   at install time. Silently matching everything is how a skin escapes onto a
   banking site.
@@ -420,7 +422,50 @@ class case:
 
 ---
 
-## 10. Errors
+## 10. Shipping more than one — the gallery
+
+A repository holding several skins puts an `index.json` beside them. Paste the
+repository's URL and Oriel reads it instead of guessing at filenames.
+
+```json
+[
+  {
+    "id": "hn-rebuilt",
+    "name": "Hacker News, rebuilt",
+    "description": "Card layout, real typography, no table soup.",
+    "author": "you",
+    "path": "skins/hn-rebuilt/skin.json",
+    "install": "https://raw.githubusercontent.com/you/skins/main/skins/hn-rebuilt/skin.json",
+    "matches": ["*://news.ycombinator.com/*"],
+    "tags": ["news", "dark"]
+  }
+]
+```
+
+`path` is relative to the repository root; `install` is the absolute raw URL, so
+the entry works when the index is read on its own, out of context. Both are
+required and they must agree — `oriel check` compares them, because an index
+whose `install` URLs point at the author's old repository is worse than no index
+at all.
+
+The layout that goes with it is one directory per skin, named for its `id`:
+
+```
+skins/
+  index.json
+  hn-rebuilt/
+    skin.json
+    style.css
+    layout.dom.json
+  reader/
+    reader.user.css
+```
+
+This is the shape the established multi-skin repositories converged on, and
+`skins/` in this repository is a worked example. One skin may target several
+sites; that is a longer `matches` array, not several entries.
+
+## 11. Errors
 
 A skin never fails silently, and a broken skin never breaks the page.
 

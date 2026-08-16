@@ -374,7 +374,9 @@ describe("bundles that reference files", () => {
         });
         expect(errors).toEqual([]);
         expect(skin.css[0].text).toBe(files["style.css"]);
-        expect(skin.dom).toEqual([{ op: "remove", select: ".ad" }]);
+        // Normalized on the way in: validateOps fills in `watch` and the op's
+        // index, so the stored shape is richer than what the author wrote.
+        expect(skin.dom).toMatchObject([{ op: "remove", select: ".ad", watch: false }]);
         expect(skin.js[0].text).toBe(files["enhance.js"]);
     });
 

@@ -6,7 +6,9 @@
  * inspected the way a user would, by looking at the page.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { buildExtension, launchExtension, startServer, waitForSkin, HTML } from "./harness.js";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { buildExtension, launchExtension, startServer, waitForSkin, repoRoot, HTML } from "./harness.js";
 import { UI } from "../extension/src/shared/protocol.js";
 
 let ext;
@@ -30,14 +32,19 @@ const BUNDLE = (origin) => ({
     id: "e2e-bundle",
     name: "E2E Bundle Skin",
     version: "2.0.0",
-    matches: [`${origin}/bundle*`],
+    // Not a match pattern: the test server binds a random port, and Oriel
+    // rejects a port in a match pattern on purpose (Chrome honours it, Firefox
+    // ignores it). `url-prefix` is the rule kind that can say this.
+    matches: [{ kind: "url-prefix", value: `${origin}/bundle` }],
     css: [{ text: "body { background: rgb(1, 2, 3); }" }],
     dom: [
         { op: "remove", select: "#ads" },
         { op: "move", select: "#masthead", into: "footer", position: "prepend" },
         { op: "wrap", select: ".post", with: { tag: "section", class: "card" } },
         { op: "setAttr", select: "main", attr: "data-skinned", value: "yes" },
-        { op: "sort", select: "main", by: { attr: "data-rank" }, numeric: true }
+        // `wrap` above has already put the rank a level down inside each card,
+        // so the sort key has to come from a descendant.
+        { op: "sort", select: "main", by: { selector: ".post", attr: "data-rank" }, numeric: true }
     ]
 });
 
@@ -193,7 +200,9 @@ describe("single-page navigation", () => {
                 id: "e2e-spa",
                 name: "E2E SPA",
                 version: "1.0.0",
-                matches: [`${server.origin}/spa`],
+                // Exact, not a prefix: the whole test is that navigating to
+                // /spa/elsewhere takes the skin off again.
+                matches: [{ kind: "url", value: `${server.origin}/spa` }],
                 css: [{ text: "#marker { color: rgb(9, 9, 9); }" }]
             })
         );
@@ -240,6 +249,58 @@ describe("single-page navigation", () => {
         });
         expect(depth).toBeLessThanOrEqual(1);
         await page.close();
+    });
+});
+
+describe("the skins this repository ships", () => {
+    // The whole loop in one test: a skin authored on a desktop, validated by
+    // the CLI, installed through the extension's real import path, applying to
+    // a real page. If the examples in `skins/` ever stop being installable, the
+    // first thing a new user does with this project fails.
+    it("installs the worked example and applies it to a live page", async () => {
+        const source = await readFile(join(repoRoot, "skins", "dim", "dim.user.css"), "utf8");
+        const summary = await install(source);
+        expect(summary.name).toBe("Dim everything");
+        expect(summary.varCount).toBe(2);
+
+        const page = await ext.page();
+        await page.goto(server.url("/other"));
+        await waitForSkin(page, summary.id);
+
+        const overlay = await page.evaluate(() => {
+            const after = getComputedStyle(document.documentElement, "::after");
+            return { opacity: after.opacity, position: after.position };
+        });
+        expect(overlay.position).toBe("fixed");
+        expect(Number(overlay.opacity)).toBeCloseTo(0.35, 2);
+
+        // And its declared variable drives it, live.
+        await ext.call(UI.SET_VALUES, { id: summary.id, values: { amount: 80 } });
+        await page.waitForFunction(
+            () => Number(getComputedStyle(document.documentElement, "::after").opacity) > 0.7,
+            undefined,
+            { timeout: 8000 }
+        );
+
+        await ext.call(UI.REMOVE, { id: summary.id });
+        await page.close();
+    });
+
+    it("installs the bundle example, whose sources are separate files", async () => {
+        // `oriel bundle` inlines them; this checks the inlined result is what
+        // the extension's own bundle parser accepts.
+        const manifest = JSON.parse(
+            await readFile(join(repoRoot, "skins", "hn-rebuilt", "skin.json"), "utf8")
+        );
+        const dir = join(repoRoot, "skins", "hn-rebuilt");
+        manifest.css = [{ text: await readFile(join(dir, "style.css"), "utf8") }];
+        manifest.dom = JSON.parse(await readFile(join(dir, "layout.dom.json"), "utf8"));
+
+        const summary = await install(JSON.stringify(manifest));
+        expect(summary.name).toBe("Hacker News, rebuilt");
+        expect(summary.hasDom).toBe(true);
+        expect(summary.targets).toContain("news.ycombinator.com");
+        await ext.call(UI.REMOVE, { id: summary.id });
     });
 });
 

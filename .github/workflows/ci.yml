@@ -32,9 +32,10 @@ jobs:
       - run: pnpm lint
       - run: pnpm test
       # The authoring CLI has no dependencies on purpose; prove it still runs
-      # on a bare Node, and that it validates the skins this repo ships.
-      - run: node tools/oriel/bin/oriel.js check skins/*
-        if: hashFiles('tools/oriel/bin/oriel.js') != ''
+      # on a bare Node, and that it validates the skins this repo ships. The
+      # trailing slash keeps the glob to directories — `skins/*` would also
+      # hand it the gallery index and the README.
+      - run: node tools/oriel/bin/oriel.js check skins/*/
 
   build:
     name: build all targets

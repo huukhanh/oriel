@@ -13,9 +13,10 @@
  */
 
 import { chromium, webkit } from "playwright";
+import { build as esbuild } from "esbuild";
 import { createServer } from "node:http";
 import { execFile } from "node:child_process";
-import { mkdtempSync, existsSync, rmSync } from "node:fs";
+import { mkdtempSync, existsSync, rmSync, mkdirSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -37,11 +38,55 @@ export function stageBrowserEnv() {
     process.env.LD_LIBRARY_PATH = [lib, join(prefix, "usr", "lib"), process.env.LD_LIBRARY_PATH]
         .filter(Boolean)
         .join(":");
+    // Playwright validates host dependencies against the dpkg database, which
+    // knows nothing about a hand-staged prefix. The libraries are there; the
+    // bookkeeping is not.
     process.env.PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "1";
-    // Headless WPE has no GPU here.
+
+    // Headless WPE aborts with "Could not create WPE EGL display" when there is
+    // no GPU. Disabling the renderer is not enough on its own — Mesa still has
+    // to be pointed at the staged prefix's drivers and EGL vendor config, or it
+    // finds nothing and the web process dies before the first page opens,
+    // reported as "Target page, context or browser has been closed".
+    process.env.LIBGL_DRIVERS_PATH = join(lib, "dri");
+    process.env.__EGL_VENDOR_LIBRARY_DIRS = join(prefix, "usr", "share", "glvnd", "egl_vendor.d");
     process.env.WEBKIT_DISABLE_DMABUF_RENDERER = "1";
     process.env.WEBKIT_DISABLE_COMPOSITING_MODE = "1";
     process.env.LIBGL_ALWAYS_SOFTWARE = "1";
+    process.env.GALLIUM_DRIVER = "llvmpipe";
+
+    stageFonts(prefix);
+}
+
+/**
+ * Give the browser something to render text with.
+ *
+ * This box has no fonts and no `/etc/fonts` at all, and the symptom is not the
+ * one you would guess: Chromium loads a page fine, then *closes it* a second
+ * later while shaping text, reported to the test as "Target page, context or
+ * browser has been closed". No crash event, no console error, nothing to
+ * attribute it to. The staged prefix already carries both a fontconfig and two
+ * hundred font files, so this only has to point at them.
+ */
+function stageFonts(prefix) {
+    const fontConfig = join(prefix, "etc", "fonts");
+    const fonts = join(prefix, "usr", "share", "fonts");
+    if (!existsSync(fontConfig) || !existsSync(fonts)) return;
+
+    process.env.FONTCONFIG_PATH = fontConfig;
+
+    // fontconfig's stock configuration looks in `$XDG_DATA_HOME/fonts`, which
+    // is a directory this user owns even with no root anywhere.
+    const share = join(process.env.HOME ?? "", ".local", "share");
+    const link = join(share, "fonts");
+    if (!existsSync(link)) {
+        try {
+            mkdirSync(share, { recursive: true });
+            symlinkSync(fonts, link, "dir");
+        } catch {
+            // Already there, or unwritable. Either way the browser will tell us.
+        }
+    }
 }
 
 /** Build the Chrome target once per suite. */
@@ -141,6 +186,29 @@ export async function launchExtension(extensionPath) {
 export async function launchWebKit() {
     stageBrowserEnv();
     return webkit.launch();
+}
+
+/**
+ * Bundle a snippet of the extension's own source into something a browser can
+ * evaluate at document_start.
+ *
+ * WebKit cannot load an extension, so the engine tests reach the modules the
+ * only other way there is: bundle them, hang them off a global, and drive them
+ * from the page. What that gives up is the extension plumbing; what it buys is
+ * the modules running in JavaScriptCore, on WebCore's DOM, which is where they
+ * will actually run on the device this product is aimed at.
+ *
+ * @param {string} source  ESM, resolved relative to the repository root.
+ */
+export async function bundleForBrowser(source) {
+    const result = await esbuild({
+        stdin: { contents: source, resolveDir: repoRoot, loader: "js" },
+        bundle: true,
+        format: "iife",
+        target: ["safari16"],
+        write: false
+    });
+    return result.outputFiles[0].text;
 }
 
 /** A page whose skinning has settled: the engine reports when it has applied. */
