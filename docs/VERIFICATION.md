@@ -13,7 +13,7 @@ cannot.
 
 ### 1. Node — the logic
 
-`extension/src/core/` is pure: no `chrome.*`, no `browser.*`, no `window`, no
+`engine/core/` is pure: no `chrome.*`, no `browser.*`, no `window`, no
 `fetch`. `scripts/lint.mjs` fails the build if any of those appear there. Modules
 that need a DOM take one as an argument; modules that need the network take a
 URL and hand back a list of candidates for someone else to fetch.

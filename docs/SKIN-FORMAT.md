@@ -1,6 +1,6 @@
 # The Oriel skin format
 
-**Status:** normative for v1. Everything in `extension/src/core/` implements
+**Status:** normative for v1. Everything in `engine/core/` implements
 this document; if code and document disagree, the document is the bug report.
 
 A **skin** is a package that changes a website's interface. Not a colour tweak —
@@ -13,15 +13,18 @@ A skin is four things, any of which may be empty:
 |---|---|---|
 | **CSS** | restyle, relayout, hide | everywhere, always |
 | **DOM ops** | move, wrap, remove, insert, sort, rewrite text | everywhere, always |
-| **JS** | anything | where the browser permits user code (see [§8](#8-javascript-and-where-it-runs)) |
+| **JS** | anything, plus the browser's own API | always in the browser; see [§8](#8-javascript-and-where-it-runs) |
 | **Vars** | user-tunable settings, surfaced as a generated settings UI | everywhere |
 
 CSS and DOM ops are *declarative*: Oriel interprets them itself, so they are
-immune to the page's Content-Security-Policy and to the extension platform's
-restrictions on running code obtained at runtime. **A skin that stays
-declarative runs identically on every browser Oriel supports, including Safari
-on iOS.** JS is the escape hatch, and the format is honest about the fact that
-it is not always available.
+immune to the page's Content-Security-Policy and need no code execution at all.
+**A skin that stays declarative runs identically on every host**, including the
+WebExtension build where a platform may refuse to run downloaded code.
+
+In the browser, JavaScript is not a fallback position — it is the door to the
+tabs, the browser's own interface, request interception and the device. That
+surface is [`BROWSER-API.md`](BROWSER-API.md); this document covers what a skin
+*is*, and the parts of it that work anywhere.
 
 ---
 

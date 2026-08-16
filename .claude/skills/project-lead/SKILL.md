@@ -20,7 +20,7 @@ Read both before deciding anything.
 not an iPhone, not even Safari on a desktop. So the plan front-loads what can be
 proven and keeps what cannot in small, hand-reviewable pieces.
 
-**Therefore: push logic into `extension/src/core/`.** It is pure by lint rule,
+**Therefore: push logic into `engine/core/`.** It is pure by lint rule,
 and that single constraint is why the targeting engine, four parsers, the layout
 engine and the GitHub resolver are all provable in Node. When a task looks like
 plumbing, find the kernel and move it.

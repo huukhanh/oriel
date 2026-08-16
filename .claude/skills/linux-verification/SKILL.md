@@ -17,11 +17,11 @@ pnpm test:e2e   # real Chromium with the extension loaded, and real WebKit
 ## Layout
 
 ```
-extension/src/core/       Pure. No chrome.*, browser.*, window, localStorage, fetch.
-extension/src/shared/     The message protocol and the API shim. Touches chrome.*.
-extension/src/background/ Service worker. Not directly testable; keep it thin.
-extension/src/content/    The engine. Takes its document as an argument where it can.
-extension/src/ui/         views.js and varsform.js are pure functions of data → DOM.
+engine/core/       Pure. No chrome.*, browser.*, window, localStorage, fetch.
+hosts/extension/shared/     The message protocol and the API shim. Touches chrome.*.
+hosts/extension/background/ Service worker. Not directly testable; keep it thin.
+engine/runtime/    The engine. Takes its document as an argument where it can.
+browser/ui/         views.js and varsform.js are pure functions of data → DOM.
 tools/oriel/              The authoring CLI. Zero dependencies, imports core/ for real.
 test/                     vitest. Everything above except background/.
 e2e/                      Playwright. The built extension, and the engine.

@@ -29,5 +29,5 @@ Two facts drive almost every rule in these skills:
    iPhone in the development loop. The gap is real, it is named in
    `docs/VERIFICATION.md`, and it is closed by a person, not by CI.
 
-Read `docs/SKIN-FORMAT.md` before touching `extension/src/core/` — it is
+Read `docs/SKIN-FORMAT.md` before touching `engine/core/` — it is
 normative, and when code and document disagree the document is the bug report.
