@@ -1,7 +1,7 @@
 /**
  * Validates one or more skins and exits non-zero on any error. All the
  * actual validation lives in skin-loader.js (which defers to the real
- * extension/src/core modules where they exist); this command is just the
+ * engine/core modules where they exist); this command is just the
  * reporting shell around it — plus, for a `skins/index.json` gallery file,
  * the one check that's specific to it: `path` and `install` have to name
  * the same file (docs/SKIN-FORMAT.md §10).

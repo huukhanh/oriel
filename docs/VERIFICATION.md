@@ -1,9 +1,15 @@
 # What is proven, and what is not
 
-This project is developed on a headless Linux box. There is no Mac, no iPhone,
-and no Safari anywhere in the loop — and Safari on iOS is the browser Oriel is
-aimed at. That gap is the central fact about this codebase, and most of its
-design follows from it.
+This project is developed on a headless Linux box. There is no Mac, no iPhone
+and no Swift compiler in the loop — and Oriel is a browser for iOS. That gap is
+the central fact about this codebase, and most of its design follows from it.
+
+The gap got wider when Oriel stopped being an extension
+([decision 001](decisions/001-browser-not-extension.md)): an extension is mostly
+JavaScript and mostly testable, while a browser has a native shell that is
+neither. The response was to draw the seam — `engine/host/contract.js` — so that
+the untestable half is a transport and every decision sits on the side that can
+be tested.
 
 The response is not optimism. It is to push as much of the product as possible
 into places that *can* be checked here, and then to be exact about the part that
@@ -13,7 +19,7 @@ cannot.
 
 ### 1. Node — the logic
 
-`extension/src/core/` is pure: no `chrome.*`, no `browser.*`, no `window`, no
+`engine/core/` is pure: no `chrome.*`, no `browser.*`, no `window`, no
 `fetch`. `scripts/lint.mjs` fails the build if any of those appear there. Modules
 that need a DOM take one as an argument; modules that need the network take a
 URL and hand back a list of candidates for someone else to fetch.
@@ -33,12 +39,13 @@ without a browser at all:
 
 This is the majority of the code and nearly all of the code that is subtle.
 
-### 2. Chromium — the extension
+### 2. Chromium — the engine inside a real browser
 
-Chromium is the only engine on this machine that can load a WebExtension, so it
-is where the parts that are not logic get proven. `e2e/extension.e2e.test.js`
-builds `dist/chrome`, loads it, and drives it through the real message protocol
-from a real extension page:
+Chromium is the only engine on this machine that can load a WebExtension. That
+is why the extension build survives the pivot to a browser: demoted to a test
+host, it remains the only way to run the whole engine inside a real browser
+here. `e2e/extension.e2e.test.js` builds `dist/chrome`, loads it, and drives it
+through the real message protocol from a real extension page:
 
 - the manifest parses and the service worker boots;
 - the content script runs at `document_start` on a real HTTP page;
@@ -70,12 +77,18 @@ same — all of that is Safari's own layer, and nothing here touches it.
 **iOS.** Enabling an extension, granting per-site access, the page menu, and
 whether any of it is usable one-handed.
 
-**The Swift.** `apple/` cannot be compiled here. It is kept as small as it can
-possibly be for exactly that reason: one view, one row, one handler that does
-nothing. The CI job in `.github/workflows/apple.yml` is the first thing that has
-ever compiled it, and it also checks that the built extension actually landed
-inside the `.appex` — because an extension bundle missing its `manifest.json`
-installs fine and then does nothing at all.
+**The Swift.** `apple/` cannot be compiled here. `.github/workflows/apple.yml`
+is the first thing that ever does, and it also asserts that the built web
+extension landed inside the `.appex` — because a bundle missing its
+`manifest.json` installs fine and then does nothing at all.
+
+The browser shell makes this the largest unverified surface in the project, and
+two decisions exist to keep it small. The browser's own interface — tab strip,
+address bar, toolbar — is **a document, not SwiftUI**, so it is tested in jsdom
+like any other UI. And the native side is a transport behind
+`engine/host/contract.js`, whose rule that a declared capability must have an
+implementation is checked in Node against every host profile. What is left in
+Swift is a window, a web view per tab, and a message handler.
 
 ## The one platform fact that was measured rather than assumed
 
@@ -106,13 +119,18 @@ in the extension reports it in one line.
 Not "does it work" — the parts that can be checked are checked. A device session
 should answer the things that are structurally unknowable from here:
 
-1. Does the extension appear in Settings, and does granting site access work?
-2. Does the capability line say JavaScript runs, or that it is suspended?
-3. Does a skin apply before the page paints, or is there a visible flash?
-4. Is the manager usable with a thumb, and does the editor work with the iOS
-   keyboard covering half the screen?
-5. Does the background context survive long enough for an import from GitHub to
-   finish?
+1. Does the app launch, and does the first tab load a page?
+2. Does a skin apply before the page paints, or is there a visible flash?
+3. **Does a skin's JavaScript run?** The browser is supposed to make this
+   unconditional — no extension CSP, no permission switch. If it does not, the
+   premise of decision 001 is wrong and needs revisiting immediately.
+4. Does the native bridge answer? Every `tabs` call crosses into Swift, and a
+   silent bridge is the failure mode the timeout in `hosts/ios/bridge.js` exists
+   to make visible rather than fix.
+5. Is the chrome usable one-handed — tab strip scrolling, the address bar with
+   the keyboard up, reachability of the toolbar on a large phone?
+6. Does a skin that restyles the browser's own interface actually change it?
+   That is the claim the whole pivot rests on.
 
 Each of those changes a design decision. Anything that does not is not worth a
 build cycle.

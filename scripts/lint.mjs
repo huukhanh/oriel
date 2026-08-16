@@ -5,7 +5,7 @@
  *
  *   1. Every JavaScript file parses. `node --check` costs nothing and a syntax
  *      error in a content script is invisible until a page fails to skin.
- *   2. `extension/src/core/` stays pure. The moment a core module reaches for
+ *   2. `engine/core/` stays pure. The moment a core module reaches for
  *      `chrome.*` it stops being testable in Node, and the project's entire
  *      verification story is that the interesting logic is testable in Node.
  */
@@ -51,7 +51,7 @@ const FORBIDDEN = [
     [/(?<![.\w])fetch\s*\(/, "fetch( — core does URL algebra; the caller fetches"]
 ];
 
-const coreDir = join(root, "extension", "src", "core");
+const coreDir = join(root, "engine", "core");
 for await (const file of walk(coreDir)) {
     const text = await readFile(file, "utf8");
     const code = text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");

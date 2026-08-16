@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { SkinParseError } from "../extension/src/core/types.js";
+import { SkinParseError } from "../engine/core/types.js";
 import {
     ruleFromString,
     compileRule,
@@ -16,7 +16,7 @@ import {
     matchesTargets,
     describeTargets,
     originPatterns
-} from "../extension/src/core/target.js";
+} from "../engine/core/target.js";
 
 /** One `it` per URL, so a failure reads as "rejects https://…" rather than "table". */
 function verdicts(rule, cases) {

@@ -1,6 +1,6 @@
 ---
 name: extension-injection
-description: The measured, counter-intuitive rules about getting CSS and JavaScript onto someone else's page from a browser extension — content-script CSP, world isolation, single-page navigation, stylesheet injection under a strict style-src, and where Safari differs. Read this before writing or reviewing anything under extension/src/content/, extension/src/background/, or anything touching how a skin reaches a page. Trigger it whenever a task mentions injection, content scripts, CSP, run-at timing, SPA route changes, userScripts, or a skin not applying. These rules are not derivable from the docs and re-deriving them from first principles produces wrong code that looks right.
+description: The measured, counter-intuitive rules about getting CSS and JavaScript onto someone else's page from a browser extension — content-script CSP, world isolation, single-page navigation, stylesheet injection under a strict style-src, and where Safari differs. Read this before writing or reviewing anything under engine/runtime/, hosts/extension/background/, or anything touching how a skin reaches a page. Trigger it whenever a task mentions injection, content scripts, CSP, run-at timing, SPA route changes, userScripts, or a skin not applying. These rules are not derivable from the docs and re-deriving them from first principles produces wrong code that looks right.
 ---
 
 # Getting a skin onto a page
@@ -122,7 +122,7 @@ background scheduling on iOS.
 
 ## 7. Where to put logic
 
-`extension/src/core/` is pure — no `chrome.*`, no `browser.*`, no `window`, no
+`engine/core/` is pure — no `chrome.*`, no `browser.*`, no `window`, no
 `fetch`; `scripts/lint.mjs` fails the build otherwise. Modules that need a DOM
 take one as an argument. That is the whole reason most of this product is
 testable on a machine with no browser, and the pressure to keep it that way is

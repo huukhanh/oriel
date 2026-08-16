@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { createStyleHost } from "../extension/src/content/styles.js";
-import { PAGE } from "../extension/src/shared/protocol.js";
+import { createStyleHost } from "../engine/runtime/styles.js";
+import { PAGE } from "../hosts/extension/shared/protocol.js";
 
 /**
  * The stylesheet host has two paths and the end-to-end suite can only reach

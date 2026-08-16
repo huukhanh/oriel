@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { PAGE, UI, EVENT, KEY, DEFAULT_SETTINGS } from "../extension/src/shared/protocol.js";
+import { PAGE, UI, EVENT, KEY, DEFAULT_SETTINGS } from "../hosts/extension/shared/protocol.js";
 
 /**
  * The message boundary, checked statically.
@@ -13,10 +13,10 @@ import { PAGE, UI, EVENT, KEY, DEFAULT_SETTINGS } from "../extension/src/shared/
  * produces no error anywhere, just a control that does nothing when tapped. It
  * is the single most likely way to break this extension silently.
  */
-const root = join(import.meta.dirname, "..", "extension", "src");
+const root = join(import.meta.dirname, "..");
 const read = (path) => readFileSync(join(root, path), "utf8");
 
-const background = read("background/main.js");
+const background = read("hosts/extension/background/main.js");
 
 /** Every `[UI.FOO]` / `[PAGE.FOO]` key in the handler table. */
 function handlerNames(source) {
@@ -52,13 +52,13 @@ describe("the message protocol", () => {
     it("answers every message the UI and the content script send", () => {
         const handlers = handlerNames(background);
         const senders = [
-            "ui/manager.js",
-            "ui/popup.js",
-            "ui/views.js",
-            "ui/rpc.js",
-            "content/main.js",
-            "content/styles.js",
-            "content/oriel-api.js"
+            "browser/ui/manager.js",
+            "browser/ui/popup.js",
+            "browser/ui/views.js",
+            "browser/ui/rpc.js",
+            "engine/runtime/main.js",
+            "engine/runtime/styles.js",
+            "engine/runtime/oriel-api.js"
         ];
 
         const unanswered = [];
@@ -77,7 +77,13 @@ describe("the message protocol", () => {
     });
 
     it("declares every constant the UI and content script reach for", () => {
-        const files = ["ui/manager.js", "ui/popup.js", "ui/views.js", "content/main.js", "content/oriel-api.js"];
+        const files = [
+            "browser/ui/manager.js",
+            "browser/ui/popup.js",
+            "browser/ui/views.js",
+            "engine/runtime/main.js",
+            "engine/runtime/oriel-api.js"
+        ];
         const undeclared = [];
         for (const file of files) {
             for (const name of referenced(read(file))) {

@@ -12,7 +12,7 @@ for first-try success.
 
 `apple/` exists because iOS requires a container app to install a Safari Web
 Extension. That is its entire job. Oriel is a web extension — the product lives
-in `extension/src/`, gets copied into the `.appex` verbatim by a build phase,
+in `engine/`, gets copied into the `.appex` verbatim by a build phase,
 and is covered by 700+ tests.
 
 Today `apple/` is three short files: an `App`, a `SetupView`, a `StepRow`, and a

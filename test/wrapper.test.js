@@ -5,7 +5,7 @@ import {
     API_SURFACE,
     registrationId,
     parseRegistrationId
-} from "../extension/src/core/wrapper.js";
+} from "../engine/core/wrapper.js";
 
 /**
  * This module generates source that will be handed to a browser and executed in

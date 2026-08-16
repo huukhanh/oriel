@@ -14,10 +14,9 @@ import { cp, mkdir, rm, writeFile, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import { manifestFor, TARGETS, VERSION } from "../extension/manifest.config.js";
+import { manifestFor, TARGETS, VERSION } from "../hosts/extension/manifest.config.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const src = join(root, "extension", "src");
 const dist = join(root, "dist");
 
 const args = process.argv.slice(2);
@@ -27,46 +26,77 @@ const value = (name, fallback) => {
     return i === -1 ? fallback : args[i + 1];
 };
 
-const targets = value("target", "all") === "all" ? TARGETS : [value("target")];
+/**
+ * `ios` is not a WebExtension target and has no manifest. It emits the single
+ * script the browser's Swift shell installs as a document-start user script,
+ * plus the documents the browser loads for its own interface. Kept in the same
+ * build so the engine cannot drift between the two shells.
+ */
+const ALL_TARGETS = [...TARGETS, "ios"];
+const targets = value("target", "all") === "all" ? ALL_TARGETS : [value("target")];
 const minify = flag("minify");
 const watch = flag("watch");
 
 /** Entry points, and the filename each must land on — the HTML refers to these by name. */
 const ENTRIES = [
-    { in: join(src, "background", "main.js"), out: "background" },
-    { in: join(src, "content", "main.js"), out: "content" },
-    { in: join(src, "ui", "popup.js"), out: "popup" },
-    { in: join(src, "ui", "manager.js"), out: "manager" }
+    { in: join(root, "hosts", "extension", "background", "main.js"), out: "background" },
+    { in: join(root, "engine", "runtime", "main.js"), out: "content" },
+    { in: join(root, "browser", "ui", "popup.js"), out: "popup" },
+    { in: join(root, "browser", "ui", "manager.js"), out: "manager" }
 ];
 
 /** Copied verbatim, path preserved relative to the second element. */
 const COPY = [
-    [join(src, "ui"), ["popup.html", "manager.html", "theme.css"]],
-    [join(root, "extension", "icons"), null]
+    [join(root, "browser", "ui"), ["popup.html", "manager.html", "theme.css"], ""],
+    [join(root, "assets", "icons"), null, "icons"]
 ];
 
-async function copyStatic(outDir) {
-    for (const [dir, names] of COPY) {
+async function copyStatic(outDir, entries = COPY) {
+    for (const [dir, names, sub] of entries) {
         if (!existsSync(dir)) continue;
         const list = names ?? (await readdir(dir));
-        const sub = relative(join(root, "extension"), dir);
         for (const name of list) {
             const from = join(dir, name);
             if (!existsSync(from)) continue;
-            const to = sub === "src/ui" ? join(outDir, name) : join(outDir, sub, name);
+            const to = sub ? join(outDir, sub, name) : join(outDir, name);
             await mkdir(dirname(to), { recursive: true });
             await cp(from, to, { recursive: true });
         }
     }
 }
 
+/** The browser: one injected script, and the chrome's own documents. */
+const IOS_ENTRIES = [
+    { in: join(root, "hosts", "ios", "main.js"), out: "engine" },
+    { in: join(root, "browser", "chrome", "chrome.js"), out: "chrome" },
+    { in: join(root, "browser", "ui", "manager.js"), out: "manager" }
+];
+
+const IOS_COPY = [
+    [join(root, "browser", "chrome"), ["chrome.html", "chrome.css"], ""],
+    [join(root, "browser", "ui"), ["manager.html", "theme.css"], ""],
+    [join(root, "assets", "icons"), null, "icons"]
+];
+
 async function buildTarget(target) {
     const outDir = join(dist, target);
     await rm(outDir, { recursive: true, force: true });
     await mkdir(outDir, { recursive: true });
 
+    const ios = target === "ios";
+    const wanted = ios ? IOS_ENTRIES : ENTRIES;
+    const entries = wanted.filter((entry) => existsSync(entry.in));
+    // Skipping a missing entry keeps the build usable while a piece is still
+    // being written, but silently is how a renamed entry point becomes an
+    // extension that installs and does nothing.
+    for (const entry of wanted) {
+        if (!existsSync(entry.in)) {
+            process.stderr.write(`build: ${target}: no ${relative(root, entry.in)}, skipping "${entry.out}"\n`);
+        }
+    }
+
     const options = {
-        entryPoints: ENTRIES.map((e) => ({ in: e.in, out: e.out })),
+        entryPoints: entries.map((e) => ({ in: e.in, out: e.out })),
         outdir: outDir,
         bundle: true,
         format: "iife",
@@ -88,11 +118,13 @@ async function buildTarget(target) {
         await build(options);
     }
 
-    await copyStatic(outDir);
-    await writeFile(
-        join(outDir, "manifest.json"),
-        JSON.stringify(manifestFor(target), null, 2) + "\n"
-    );
+    await copyStatic(outDir, ios ? IOS_COPY : COPY);
+    if (!ios) {
+        await writeFile(
+            join(outDir, "manifest.json"),
+            JSON.stringify(manifestFor(target), null, 2) + "\n"
+        );
+    }
 
     return outDir;
 }
@@ -127,6 +159,7 @@ for (const target of targets) {
 
 let failed = false;
 for (const [target, outDir] of built) {
+    if (target === "ios") continue; // no manifest to check
     for (const problem of await checkManifestFiles(outDir, target)) {
         process.stderr.write(`build: ${problem}\n`);
         failed = true;

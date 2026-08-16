@@ -9,7 +9,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { buildExtension, launchExtension, startServer, waitForSkin, repoRoot, HTML } from "./harness.js";
-import { UI } from "../extension/src/shared/protocol.js";
+import { UI } from "../hosts/extension/shared/protocol.js";
 
 let ext;
 let server;

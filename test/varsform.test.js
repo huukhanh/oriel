@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
-import { buildVarsForm, readValues } from "../extension/src/ui/varsform.js";
+import { buildVarsForm, readValues } from "../browser/ui/varsform.js";
 
 /**
  * The settings form is generated from a skin's own declarations, so a skin

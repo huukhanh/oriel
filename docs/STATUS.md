@@ -1,63 +1,76 @@
-# Where the rework stands
+# Where the project stands
 
-Working branch: `feat/rework-extension`. `main` is still the old iOS browser.
+Working branch: `feat/63-browser-shell` ([PR #63](https://github.com/huukhanh/oriel/pull/63)).
+`main` holds the extension version.
 
-## The change in direction
+## What Oriel is
 
-Oriel was a scriptable iOS browser. It is now a **cross-browser extension that
-stores and applies skins** — packages that completely change a website's
-interface — installed by pasting source or by giving a GitHub link, and authored
-on a desktop with a CLI. The old `App/`, `Core/` and `web/` trees are gone.
-[`SKIN-FORMAT.md`](SKIN-FORMAT.md) is the contract and is normative.
+A **browser** that stores and applies **skins** — packages of CSS, declarative
+layout operations and JavaScript that completely change a website's interface.
+Installed by pasting a file or giving a GitHub link; authored on a desktop with
+`tools/oriel`; published to GitHub like any other file.
 
-## Built and proven
+It is a browser rather than an extension because an extension cannot reliably
+run a skin's JavaScript, cannot see the page's own navigation, and cannot touch
+the browser's own interface —
+[decision 001](decisions/001-browser-not-extension.md).
+
+Two documents are normative: [`SKIN-FORMAT.md`](SKIN-FORMAT.md) for what a skin
+*is*, [`BROWSER-API.md`](BROWSER-API.md) for what it can *do*.
+
+## Proven
 
 ```
-lint clean · 724 unit tests · 24 end-to-end tests in real browsers
+lint clean · 767 unit tests · 26 end-to-end tests in real browsers
 ```
 
 | Piece | State |
 |---|---|
-| `core/target.js` | Six rule kinds, Chrome match patterns. 235 tests, mutation-checked. |
-| `core/domops.js` | 15 layout operations, each with an inverse. 81 tests. |
-| `core/usercss.js`, `core/vars.js` | Stylus-compatible parsing and variables. 93 tests. |
-| `core/userscript.js` | Tampermonkey/Violentmonkey metadata. 52 tests. |
-| `core/source.js`, `core/version.js` | GitHub link resolution, loose-semver comparison. 84 tests. |
-| `core/skin.js` | The funnel: four input formats in, one `Skin` out. 41 tests. |
-| `core/wrapper.js` | Generated source for the user-script world. 15 tests. |
-| `background/*` | Store, capability probe, install, updates, apply, router. |
-| `content/*` | The engine: stylesheets, the `oriel` API, single-page re-entry. |
-| `ui/*` | Popup and manager, as pure render functions. 73 tests. |
+| `engine/core/` | Targeting (235), layout operations (81), UserCSS + variables (93), userscripts (52), sources + versions (84), the skin funnel (41), the wrapper (15). Pure, and lint-enforced pure. |
+| `engine/host/` | The seam a shell must satisfy, plus a recording test host. 24 tests. |
+| `engine/runtime/` | The in-page engine. **Still speaks the extension's message protocol** — see below. |
+| `hosts/ios/` | The native bridge: wire format, both WebKit reply mechanisms, timeouts. 19 tests. |
+| `hosts/extension/` | Demoted to a test host. The only way to run the engine in a real browser here. |
+| `browser/ui/` | Manager and popup, as pure render functions. 73 tests. |
+| `browser/chrome/` | The browser's own interface, as a document rather than SwiftUI. |
+| `apple/Sources/Browser/` | The Swift shell: tabs, web views, the bridge. |
 | `tools/oriel` | The authoring CLI. 26 tests. |
 | `skins/` | Three worked examples, installed by the e2e suite. |
-| `apple/` | Container app and Safari Web Extension target, XcodeGen. **Compiles green in CI**; never run on a device. |
-| CI | `ci.yml` on every push; `apple.yml` manual and tag-only. |
 
 ## What running it in real browsers changed
 
-Six things that would otherwise have shipped looking correct. They are the
-argument for the e2e suites existing at all:
+Six things that would otherwise have shipped looking correct, and are the reason
+the e2e suites exist:
 
-1. **Chromium blocks `eval` in content scripts.** Skin JavaScript therefore has
-   a layered strategy and a capability probe, not one mechanism.
+1. **Chromium blocks `eval` in content scripts** — which is most of why Oriel is
+   now a browser.
 2. **A `<style>` element is blocked by `style-src 'self'`;** a constructed
-   stylesheet is not. The fallback path was rewritten around that.
-3. **A content script cannot see the page's own `pushState`** — separate
-   worlds. Route changes need events, a background signal and a poll.
-4. **The early CSS push could never be undone,** because `removeCSS` matches on
-   exact text. Removed.
-5. **Adopted-sheet removal mistook its own sheet for the page's** and kept it
-   forever.
-6. A skin's stylesheet has to survive a document with **no root element yet**.
+   stylesheet is not.
+3. **A content script cannot see the page's own `pushState`** — separate worlds.
+4. **The early CSS push could never be undone**, because `removeCSS` matches on
+   exact text.
+5. **Adopted-sheet removal mistook its own sheet for the page's.**
+6. A stylesheet has to survive a document with **no root element yet**.
 
-## Left to do
+## Next, in order
 
-1. **A device test — [#61](https://github.com/huukhanh/oriel/issues/61).**
-   Nothing here can touch Safari, and the open question that decides how much of
-   the format works on iOS — whether Safari lets an extension run code it
-   downloaded — is one line in the Capabilities panel. An unsigned `.ipa` is
-   already built and attached to the `apple` workflow run, so it needs no Mac.
-2. **Smaller gaps.** `oriel check <gallery-dir>` does not recognise an
-   `index.json`; there is no test for the background's storage layer; the
-   manager's editor is a textarea with a line number rather than anything
-   cleverer.
+1. **Wire `engine/runtime` to the Host.** It still talks to the extension's
+   message protocol, so the browser cannot run the engine yet —
+   `hosts/ios/main.js` establishes the bridge and stops at an honest line. This
+   is the piece between here and a browser that actually skins a page.
+2. **Compile the Swift.** A Swift 6.1 toolchain and stub-framework typechecking
+   work on this box, so most of the shell can be machine-checked here before
+   `apple.yml` ever runs. What that cannot check is whether the Apple API
+   signatures are real — that list goes to a human with Xcode.
+3. **A device test.** [#61](https://github.com/huukhanh/oriel/issues/61) is
+   written for the extension build and needs rewriting. The question that
+   matters most is now different: an extension had to ask whether skin
+   JavaScript runs at all; a browser is supposed to guarantee it, and if it does
+   not then decision 001's premise is wrong.
+
+## Smaller gaps
+
+- No test for the background's storage layer.
+- `oriel check <gallery-dir>` does not recognise an `index.json`.
+- The manager's editor is a textarea with a line number, nothing cleverer.
+- `docs/SAFARI.md` describes installing an extension, not a browser.

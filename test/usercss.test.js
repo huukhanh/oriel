@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isUserCss, parseUserCss, parseMozDocument, stringifyUserCss } from "../extension/src/core/usercss.js";
+import { isUserCss, parseUserCss, parseMozDocument, stringifyUserCss } from "../engine/core/usercss.js";
 
 describe("isUserCss", () => {
     it("is true for a well-formed metadata block", () => {

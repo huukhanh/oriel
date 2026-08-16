@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { compareVersions, isNewer, parseVersion } from "../extension/src/core/version.js";
+import { compareVersions, isNewer, parseVersion } from "../engine/core/version.js";
 
 describe("parseVersion", () => {
     it("treats missing segments as 0", () => {

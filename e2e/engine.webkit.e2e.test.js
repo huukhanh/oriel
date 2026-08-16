@@ -19,10 +19,10 @@ let engine;
 
 beforeAll(async () => {
     engine = await bundleForBrowser(`
-        import * as domops from "./extension/src/core/domops.js";
-        import { createStyleHost } from "./extension/src/content/styles.js";
-        import { wrapForUserScriptWorld } from "./extension/src/core/wrapper.js";
-        import { compileTargets } from "./extension/src/core/target.js";
+        import * as domops from "./engine/core/domops.js";
+        import { createStyleHost } from "./engine/runtime/styles.js";
+        import { wrapForUserScriptWorld } from "./engine/core/wrapper.js";
+        import { compileTargets } from "./engine/core/target.js";
         globalThis.__oriel = { domops, createStyleHost, wrapForUserScriptWorld, compileTargets };
     `);
 

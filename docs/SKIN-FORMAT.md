@@ -1,6 +1,6 @@
 # The Oriel skin format
 
-**Status:** normative for v1. Everything in `extension/src/core/` implements
+**Status:** normative for v1. Everything in `engine/core/` implements
 this document; if code and document disagree, the document is the bug report.
 
 A **skin** is a package that changes a website's interface. Not a colour tweak —
@@ -13,15 +13,18 @@ A skin is four things, any of which may be empty:
 |---|---|---|
 | **CSS** | restyle, relayout, hide | everywhere, always |
 | **DOM ops** | move, wrap, remove, insert, sort, rewrite text | everywhere, always |
-| **JS** | anything | where the browser permits user code (see [§8](#8-javascript-and-where-it-runs)) |
+| **JS** | anything, plus the browser's own API | always in the browser; see [§8](#8-javascript-and-where-it-runs) |
 | **Vars** | user-tunable settings, surfaced as a generated settings UI | everywhere |
 
 CSS and DOM ops are *declarative*: Oriel interprets them itself, so they are
-immune to the page's Content-Security-Policy and to the extension platform's
-restrictions on running code obtained at runtime. **A skin that stays
-declarative runs identically on every browser Oriel supports, including Safari
-on iOS.** JS is the escape hatch, and the format is honest about the fact that
-it is not always available.
+immune to the page's Content-Security-Policy and need no code execution at all.
+**A skin that stays declarative runs identically on every host**, including the
+WebExtension build where a platform may refuse to run downloaded code.
+
+In the browser, JavaScript is not a fallback position — it is the door to the
+tabs, the browser's own interface, request interception and the device. That
+surface is [`BROWSER-API.md`](BROWSER-API.md); this document covers what a skin
+*is*, and the parts of it that work anywhere.
 
 ---
 
@@ -360,15 +363,28 @@ treated as "different, therefore newer".
 
 ## 8. JavaScript, and where it runs
 
-Skin JS is code the extension obtained at runtime. Every browser restricts that,
-and they restrict it differently. Oriel probes what is available and reports it
-in the UI rather than failing silently.
+**In the browser, a skin's JavaScript always runs.** Oriel owns the web view, so
+the runtime is installed as a document-start user script with nothing between it
+and the page: no extension Content-Security-Policy, no permission switch for the
+user to find, and exact timing on every navigation including the first.
+
+That guarantee is the reason Oriel is a browser rather than an extension, and it
+is written down in [decision 001](decisions/001-browser-not-extension.md).
+
+It does not hold in the **extension host**, which is kept so the engine can be
+tested in a real browser on Linux and is handy for authoring on a desktop.
+There, the platform decides:
 
 | Mechanism | Used when | Notes |
 |---|---|---|
-| `userScripts` API | Chrome 120+, Firefox 136+ | The purpose-built path. Runs in a dedicated `USER_SCRIPT` world. |
-| `new Function` in the content script | the isolated world permits it | The classic path. Works where the extension CSP is not applied to content scripts. |
-| declarative only | nowhere else works | CSS and DOM ops still apply. The skin is marked **JS suspended** in the UI and the log says why. |
+| `userScripts` API | Chrome 120+, Firefox 136+, once the user enables it per-extension | Runs in a dedicated `USER_SCRIPT` world. |
+| `new Function` in the content script | the isolated world permits it | Blocked on Chromium — the extension's own CSP applies there, measured. |
+| declarative only | nowhere else works | CSS and layout operations still apply. The skin is marked **JS suspended** and the log says why. |
+
+So: write JavaScript freely for the browser, and keep the *structure* of a skin
+in CSS and layout operations anyway. A skin whose layout only appears once its
+script has run looks broken in the extension host, and a skin whose script only
+adds behaviour degrades to something still worth having.
 
 A `js` entry declares:
 
@@ -384,24 +400,31 @@ A `js` entry declares:
 
 ### 8.1 The `oriel` object
 
-Skin JS gets one global:
+Skin JS gets one global. The part every host provides:
 
 ```js
 oriel.id                     // this skin's id
 oriel.vars                   // frozen var values
 oriel.css(text) -> handle    // inject additional CSS, removed on cleanup
-oriel.dom(ops)               // run DOM ops from JS
+oriel.dom(ops)               // run layout operations from JS
 oriel.on(event, fn)          // "navigate" | "cleanup"
 oriel.watch(selector, fn)    // fn(el) for each match now and in future
 oriel.asset(name) -> url     // a bundled asset as a blob URL
 oriel.storage.get/set        // per-skin persistent storage
 oriel.log(...args)           // to the in-app log, not the page console
-oriel.fetch(url, init)       // host-permission-checked fetch from the background
+oriel.fetch(url, init)       // cross-origin, without the user's cookies
+oriel.can(capability)        // "chrome.toolbar", "tabs.open", … — always ask this
 ```
 
 `oriel.watch` exists because it is the thing every skin needs and every skin
 gets wrong: a `MutationObserver` per skin, correctly disconnected on cleanup,
 correctly not firing twice for the same node.
+
+Everything else — the browser's tabs, its own interface, request interception,
+the device, and the ability for one skin to export functions to another — is in
+[`BROWSER-API.md`](BROWSER-API.md). A namespace the running host cannot provide
+is **absent**, not a stub that fails later, so `oriel.can()` is the check and
+`typeof oriel.chrome` is a fair fallback.
 
 ---
 
