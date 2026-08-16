@@ -156,12 +156,22 @@ const OP_SPECS = {
     attrToVar: { required: ["select", "attr", "var"] }
 };
 
-/** @returns {{message:string, field:string}[]} empty when every op is valid */
+/**
+ * Field paths are `dom[i]...`, matching the shape `extension/src/core/domops.js`
+ * uses — so callers do not need to know which one produced the errors.
+ *
+ * @returns {{ops: object[], errors: {message:string, field:string}[]}}
+ */
 export function validateOps(ops) {
-    if (!Array.isArray(ops)) return [{ message: "dom must be an array of operations", field: "" }];
     const errors = [];
+    const normalized = [];
+    if (ops === undefined || ops === null) return { ops: normalized, errors };
+    if (!Array.isArray(ops)) {
+        errors.push({ message: "dom must be an array of operations", field: "dom" });
+        return { ops: normalized, errors };
+    }
     ops.forEach((op, i) => {
-        const field = `[${i}]`;
+        const field = `dom[${i}]`;
         if (!op || typeof op !== "object") { errors.push({ message: "op must be an object", field }); return; }
         const spec = OP_SPECS[op.op];
         if (!spec) { errors.push({ message: `unknown op "${op.op}"`, field: `${field}.op` }); return; }
@@ -188,8 +198,9 @@ export function validateOps(ops) {
         if (op.when !== undefined && (typeof op.when !== "object" || op.when === null)) {
             errors.push({ message: "\"when\" must be an object", field: `${field}.when` });
         }
+        normalized.push(op);
     });
-    return errors;
+    return { ops: normalized, errors };
 }
 
 // ---- vars ----------------------------------------------------------------

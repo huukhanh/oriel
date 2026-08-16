@@ -1,0 +1,102 @@
+# Generated with XcodeGen: `cd apple && xcodegen generate`.
+#
+# The .xcodeproj is deliberately not checked in. It is order-sensitive,
+# merge-hostile, and cannot be edited safely from a machine with no Xcode —
+# which is every machine this project is developed on. This file is the source
+# of truth; regenerate rather than edit.
+#
+# There is very little Swift here on purpose. A Safari Web Extension is a web
+# extension: everything Oriel does lives in `dist/safari/`, which the build
+# copies into the extension bundle verbatim. The Swift is a container app whose
+# whole job is to exist so iOS has something to install, and a handler that
+# exists because the extension point requires a principal class.
+
+name: Oriel
+
+options:
+  bundleIdPrefix: io.github.huukhanh
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+  # Nothing here is concurrent. Swift 6 strict checking would be a source of
+  # build failures on a machine we cannot reproduce, in exchange for safety
+  # this target has no use for.
+  defaultConfig: Debug
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CODE_SIGN_STYLE: Automatic
+    TARGETED_DEVICE_FAMILY: "1,2"
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  Oriel:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources/App
+      - path: Sources/Assets.xcassets
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.huukhanh.Oriel
+        INFOPLIST_FILE: Sources/App/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: NO
+    dependencies:
+      - target: OrielExtension
+        embed: true
+        codeSign: true
+
+  OrielExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Sources/Extension
+    settings:
+      base:
+        # Safari requires the extension's bundle identifier to be a child of
+        # the container app's. XcodeGen's default would give a sibling, and the
+        # failure is an extension that installs but never appears in Safari's
+        # settings.
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.huukhanh.Oriel.Extension
+        INFOPLIST_FILE: Sources/Extension/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        PRODUCT_NAME: Oriel Extension
+    postBuildScripts:
+      - name: Copy the built web extension
+        # The web extension's resources have to sit at the root of the .appex
+        # bundle — that is where Safari looks for manifest.json. They are
+        # copied rather than referenced so that `pnpm build` output and the
+        # Xcode build stay independent; the only coupling is this path.
+        script: |
+          set -e
+          SOURCE="${SRCROOT}/../dist/safari"
+          if [ ! -d "${SOURCE}" ]; then
+            echo "error: ${SOURCE} does not exist. Run 'pnpm build' at the repo root first."
+            exit 1
+          fi
+          if [ ! -f "${SOURCE}/manifest.json" ]; then
+            echo "error: ${SOURCE}/manifest.json is missing — the build did not finish."
+            exit 1
+          fi
+          DEST="${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
+          mkdir -p "${DEST}"
+          cp -R "${SOURCE}"/. "${DEST}"/
+          echo "copied web extension resources into ${DEST}"
+        basedOnDependencyAnalysis: false
+
+# CI drives xcodebuild by scheme name, so the scheme is declared rather than
+# left to XcodeGen's defaults. A scheme that quietly is not generated fails as
+# "scheme not found", which reads like a typo in the workflow.
+schemes:
+  Oriel:
+    build:
+      targets:
+        Oriel: all
+    run:
+      config: Debug
+    archive:
+      config: Release

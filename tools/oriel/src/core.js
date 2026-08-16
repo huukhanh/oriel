@@ -50,6 +50,23 @@ async function tryLoad(name, exports) {
     }
 }
 
+/**
+ * A single-rule compiler, built on top of whichever `compileTargets` got
+ * loaded. The real module and the fallback disagree on how a bad rule is
+ * reported — the real one never throws and collects `errors`, the fallback
+ * throws on the first bad rule — so this is the one place that difference is
+ * absorbed. Every caller in this CLI gets the throwing contract.
+ */
+function makeCompileRule(compileTargets) {
+    return (rule) => {
+        const compiled = compileTargets({ include: [rule], exclude: [] });
+        if (compiled.errors && compiled.errors.length) {
+            throw new Error(compiled.errors[0].message);
+        }
+        return compiled;
+    };
+}
+
 async function build() {
     const core = { usingFallback: new Set() };
     for (const [name, exports] of Object.entries(MODULES)) {
@@ -57,6 +74,7 @@ async function build() {
         if (!mod) core.usingFallback.add(name);
         for (const key of exports) core[key] = mod ? mod[key] : fallback[key];
     }
+    core.compileRule = makeCompileRule(core.compileTargets);
     return core;
 }
 
