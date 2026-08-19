@@ -125,7 +125,7 @@ should answer the things that are structurally unknowable from here:
    unconditional — no extension CSP, no permission switch. If it does not, the
    premise of decision 001 is wrong and needs revisiting immediately.
 4. Does the native bridge answer? Every `tabs` call crosses into Swift, and a
-   silent bridge is the failure mode the timeout in `hosts/ios/bridge.js` exists
+   silent bridge is the failure mode the timeout in `hosts/apple/bridge.js` exists
    to make visible rather than fix.
 5. Is the chrome usable one-handed — tab strip scrolling, the address bar with
    the keyboard up, reachability of the toolbar on a large phone?

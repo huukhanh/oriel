@@ -8,13 +8,13 @@ checked in.
 
 ```sh
 pnpm install
-pnpm build          # must produce dist/ios/ and dist/safari/
+pnpm build          # must produce dist/apple/ and dist/safari/
 cd apple
 xcodegen generate
 open Oriel.xcodeproj
 ```
 
-The build **fails loudly** if `dist/ios/engine.js`, `dist/ios/chrome.html` or
+The build **fails loudly** if `dist/apple/engine.js`, `dist/apple/chrome.html` or
 `dist/safari/manifest.json` are missing. That is deliberate: an app that builds
 without them installs fine and then does nothing, which is a failure you only
 discover on a phone.
@@ -50,7 +50,7 @@ message bridge, and tab lifecycle. Nothing else belongs here. See
 
 ## The bundle layout
 
-The build phase copies `dist/ios/` into **`Web/`** inside the app bundle. The
+The build phase copies `dist/apple/` into **`Web/`** inside the app bundle. The
 Swift looks the two files up by name:
 
 ```swift
@@ -88,7 +88,7 @@ Swift -> page    window.__orielReply(id, true,  { ok: true, value })
 events           window.__oriel.dispatch(channel, data)
 ```
 
-**The JavaScript half already exists and owns this format.** `hosts/ios/bridge.js`
+**The JavaScript half already exists and owns this format.** `hosts/apple/bridge.js`
 was written first, is merged, and has tests pinning it; the Swift is written
 against it, not the other way round. Two details that are easy to get subtly
 wrong and impossible to see failing:
@@ -105,7 +105,7 @@ Replies come back through `evaluateJavaScript` rather than through
 `WKScriptMessageHandlerWithReply`. Three reasons: registering the reply protocol
 needs a content-world API whose signature cannot be checked on a machine with no
 Xcode; a reply handler cannot push the events the chrome document needs anyway;
-and `hosts/ios/bridge.js` installs `__orielReply` unconditionally and picks its
+and `hosts/apple/bridge.js` installs `__orielReply` unconditionally and picks its
 path at run time, so taking the older one costs nothing there.
 
 **Every command is answered**, including ones this shell has not built. An
@@ -150,11 +150,11 @@ returns `unsupported` today. Nothing is stubbed silently.
     loading over `file://`. The bundle esbuild emits is an IIFE, so dropping
     `type="module"` is enough.
   - it links `../ui/theme.css`, but `IOS_COPY` in `scripts/build.mjs` flattens
-    `browser/ui/theme.css` to the root of `dist/ios/`, so the path resolves
+    `browser/ui/theme.css` to the root of `dist/apple/`, so the path resolves
     above the bundle's `Web/` directory and outside the granted read access.
-- **The engine claims every capability.** `boot()` in `hosts/ios/main.js` calls
-  `createIosHost(bridge)` with no capability list, so it defaults to all of
-  `HOST_PROFILES.ios` while most of them answer `unsupported`. Its own comment
+- **The engine claims every capability.** `boot()` in `hosts/apple/main.js` calls
+  `createAppleHost(bridge)` with no capability list, so it defaults to all of
+  `HOST_PROFILES.apple` while most of them answer `unsupported`. Its own comment
   says the list should come from the native side; there is no seam for Swift to
   pass one yet. Until there is, `oriel.can()` over-promises and skins find out
   by catching `HostUnsupportedError`.
@@ -176,5 +176,5 @@ list of signatures a human should check against Xcode's autocomplete.
 
 The macOS job in `.github/workflows/apple.yml` is still the first thing that
 sees the real SDK. That workflow currently runs `pnpm build --target safari`
-only and will need `dist/ios/` built too, or the app target's copy phase stops
+only and will need `dist/apple/` built too, or the app target's copy phase stops
 it before the compiler is reached.

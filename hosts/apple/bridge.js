@@ -14,7 +14,7 @@
  * are real possibilities and the difference is not worth a coordination round
  * trip with a person who has a Mac.
  *
- * @module hosts/ios/bridge
+ * @module hosts/apple/bridge
  */
 
 import { defineHost, HOST_PROFILES } from "../../engine/host/contract.js";
@@ -148,7 +148,7 @@ const FORWARDED = {
  * @param {object} bridge  From {@link createBridge}.
  * @param {string[]} [capabilities]  What the native side reports it can do.
  */
-export function createIosHost(bridge, capabilities = [...HOST_PROFILES.ios]) {
+export function createAppleHost(bridge, capabilities = [...HOST_PROFILES.apple]) {
     const forward = (namespace, method) => (...args) => bridge.send(namespace, method, args);
 
     const namespaces = {};
@@ -231,7 +231,7 @@ export function createIosHost(bridge, capabilities = [...HOST_PROFILES.ios]) {
     }
 
     const host = defineHost({
-        name: "ios",
+        name: "apple",
         version: "1",
         // Only declare what there is a namespace for; the contract enforces the
         // rest. A native side that reports a capability it has not built yet

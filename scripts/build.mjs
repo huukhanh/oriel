@@ -27,12 +27,12 @@ const value = (name, fallback) => {
 };
 
 /**
- * `ios` is not a WebExtension target and has no manifest. It emits the single
+ * `apple` is not a WebExtension target and has no manifest. It emits the single
  * script the browser's Swift shell installs as a document-start user script,
  * plus the documents the browser loads for its own interface. Kept in the same
  * build so the engine cannot drift between the two shells.
  */
-const ALL_TARGETS = [...TARGETS, "ios"];
+const ALL_TARGETS = [...TARGETS, "apple"];
 const targets = value("target", "all") === "all" ? ALL_TARGETS : [value("target")];
 const minify = flag("minify");
 const watch = flag("watch");
@@ -65,14 +65,14 @@ async function copyStatic(outDir, entries = COPY) {
     }
 }
 
-/** The browser: one injected script, and the chrome's own documents. */
-const IOS_ENTRIES = [
-    { in: join(root, "hosts", "ios", "main.js"), out: "engine" },
+/** The browser, on iOS and macOS: one injected script, and the chrome's own documents. */
+const APPLE_ENTRIES = [
+    { in: join(root, "hosts", "apple", "main.js"), out: "engine" },
     { in: join(root, "browser", "chrome", "chrome.js"), out: "chrome" },
     { in: join(root, "browser", "ui", "manager.js"), out: "manager" }
 ];
 
-const IOS_COPY = [
+const APPLE_COPY = [
     [join(root, "browser", "chrome"), ["chrome.html", "chrome.css"], ""],
     [join(root, "browser", "ui"), ["manager.html", "theme.css"], ""],
     [join(root, "assets", "icons"), null, "icons"]
@@ -83,8 +83,8 @@ async function buildTarget(target) {
     await rm(outDir, { recursive: true, force: true });
     await mkdir(outDir, { recursive: true });
 
-    const ios = target === "ios";
-    const wanted = ios ? IOS_ENTRIES : ENTRIES;
+    const apple = target === "apple";
+    const wanted = apple ? APPLE_ENTRIES : ENTRIES;
     const entries = wanted.filter((entry) => existsSync(entry.in));
     // Skipping a missing entry keeps the build usable while a piece is still
     // being written, but silently is how a renamed entry point becomes an
@@ -118,8 +118,8 @@ async function buildTarget(target) {
         await build(options);
     }
 
-    await copyStatic(outDir, ios ? IOS_COPY : COPY);
-    if (!ios) {
+    await copyStatic(outDir, apple ? APPLE_COPY : COPY);
+    if (!apple) {
         await writeFile(
             join(outDir, "manifest.json"),
             JSON.stringify(manifestFor(target), null, 2) + "\n"
@@ -159,7 +159,7 @@ for (const target of targets) {
 
 let failed = false;
 for (const [target, outDir] of built) {
-    if (target === "ios") continue; // no manifest to check
+    if (target === "apple") continue; // no manifest to check
     for (const problem of await checkManifestFiles(outDir, target)) {
         process.stderr.write(`build: ${problem}\n`);
         failed = true;
