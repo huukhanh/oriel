@@ -69,6 +69,20 @@ So the stubs are not scaffolding to skim past — they are **the list of claims 
 human should check against Xcode's autocomplete**, and that check takes seconds
 per symbol. Everything not in the stubs is machine-verified.
 
+## Stubs must be platform-conditional too
+
+A stub that declares an iOS-only symbol unconditionally makes both flavours
+compile and hides exactly the error this second package exists to find.
+
+That is not hypothetical. `WKWebViewConfiguration.allowsInlineMediaPlayback` is
+iOS-only; the stub declared it for both, both harnesses went green, and the
+error surfaced on a macOS runner instead — the expensive place. The stub now
+declares it inside `#if canImport(UIKit)`, and using it unconditionally
+reproduces the runner's error here in under a second.
+
+So: when a symbol exists on one platform and not the other, fence it in the
+stub. An unfenced declaration is a claim that Apple ships it everywhere.
+
 ## The rule that keeps this honest
 
 When the harness reports an error, the fix goes in `Sources/Browser`, not in the

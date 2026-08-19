@@ -163,7 +163,11 @@ final class WebViewFactory: NSObject, ObservableObject, WKNavigationDelegate {
 
     private func makeConfiguration(isPrivate: Bool) -> WKWebViewConfiguration {
         let configuration: WKWebViewConfiguration = WKWebViewConfiguration()
-        configuration.allowsInlineMediaPlayback = true
+        // iOS-only. On macOS video is inline by default and there is no such
+        // property; a Mac has no full-screen-takeover behaviour to opt out of.
+        #if canImport(UIKit)
+            configuration.allowsInlineMediaPlayback = true
+        #endif
         configuration.applicationNameForUserAgent = WebViewFactory.applicationNameForUserAgent
 
         // A private tab gets a data store that is thrown away with the app.

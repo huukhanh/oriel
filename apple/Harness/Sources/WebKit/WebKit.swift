@@ -107,7 +107,12 @@ open class WKUserContentController: NSObject {
 open class WKWebViewConfiguration: NSObject {
     open var userContentController: WKUserContentController = WKUserContentController()
     open var websiteDataStore: WKWebsiteDataStore = WKWebsiteDataStore()
-    open var allowsInlineMediaPlayback: Bool = false
+    // iOS-only in the real SDK. Declared here only on the UIKit flavour so
+    // that using it unconditionally fails the macOS harness — which is exactly
+    // how it reached a macOS runner the first time.
+    #if canImport(UIKit)
+        open var allowsInlineMediaPlayback: Bool = false
+    #endif
     open var applicationNameForUserAgent: String?
 
     public override init() { super.init() }
