@@ -27,7 +27,19 @@
 // has nothing to do with the real build.
 @_exported import FoundationNetworking
 #endif
+
+// Compiled twice, like the SwiftUI stub: once with the UIKit stub as a
+// dependency and once with the AppKit stub. `WKWebView` is a `UIView` on iOS
+// and an `NSView` on macOS, which is the only structural difference between
+// the two flavours of WebKit this project touches — that, and `scrollView`,
+// which does not exist on macOS at all.
+#if canImport(UIKit)
 import UIKit
+public typealias WKWebViewPlatformBase = UIView
+#elseif canImport(AppKit)
+import AppKit
+public typealias WKWebViewPlatformBase = NSView
+#endif
 
 // A THIRD divergence, and the one to check first: both delegate protocols are
 // declared `@MainActor` here. WebKit's headers gained main-actor annotations in
@@ -114,12 +126,14 @@ public protocol WKNavigationDelegate: NSObjectProtocol {
     )
 }
 
-open class WKWebView: UIView {
+open class WKWebView: WKWebViewPlatformBase {
     open private(set) var configuration: WKWebViewConfiguration
     open weak var navigationDelegate: WKNavigationDelegate?
     open var allowsBackForwardNavigationGestures: Bool = false
 
+    #if canImport(UIKit)
     open private(set) var scrollView: UIScrollView = UIScrollView()
+    #endif
     open private(set) var url: URL?
     open private(set) var title: String?
     open private(set) var isLoading: Bool = false

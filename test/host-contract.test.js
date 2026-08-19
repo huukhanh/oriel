@@ -139,7 +139,7 @@ describe("exposeFor", () => {
 
 describe("host profiles", () => {
     it("gives the browser everything", () => {
-        expect([...HOST_PROFILES.ios].sort()).toEqual([...CAPABILITIES].sort());
+        expect([...HOST_PROFILES.apple].sort()).toEqual([...CAPABILITIES].sort());
     });
 
     it("gives the extension host no access to the browser's own interface", () => {

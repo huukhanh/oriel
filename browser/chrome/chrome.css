@@ -348,14 +348,42 @@
     text-align: center;
 }
 
+/* A Mac window, or an iPad in landscape. Browser chrome spans the window —
+   capping and centring it would leave gutters either side of a toolbar, which
+   reads as a layout bug rather than a choice. Only the tabs get roomier. */
 @media (min-width: 720px) {
-    .chrome-root {
-        max-width: 1100px;
-        margin: 0 auto;
-        border-inline: 1px solid var(--o-line);
-    }
-
     .chrome-tab {
         width: 220px;
+    }
+
+    .chrome-tabstrip {
+        gap: 2px;
+    }
+}
+
+/* A real pointer, which on a Mac means hover is a usable affordance and 44px
+   thumb targets are wasted vertical space in a toolbar. Keyed off the input
+   device rather than the width: an iPad with a trackpad gets this too, and an
+   iPhone in landscape correctly does not. */
+@media (hover: hover) and (pointer: fine) {
+    .chrome-root {
+        --o-tap: 30px;
+    }
+
+    .chrome-tab-close {
+        opacity: 0;
+        transition: opacity 120ms ease;
+    }
+
+    .chrome-tab:hover .chrome-tab-close,
+    .chrome-tab.is-active .chrome-tab-close,
+    .chrome-tab-close:focus-visible {
+        opacity: 1;
+    }
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: reduce) {
+    .chrome-tab-close {
+        transition: none;
     }
 }

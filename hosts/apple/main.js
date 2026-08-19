@@ -10,10 +10,10 @@
  * capability probe. Those existed in the extension because the engine was a
  * guest in someone else's runtime. Here it is not.
  *
- * @module hosts/ios/main
+ * @module hosts/apple/main
  */
 
-import { createBridge, createIosHost } from "./bridge.js";
+import { createBridge, createAppleHost } from "./bridge.js";
 import { exposeFor } from "../../engine/host/contract.js";
 
 /**
@@ -52,7 +52,7 @@ export function boot(options = {}) {
     // No list at all means an old or misconfigured shell. Trusting the full
     // profile there would have every namespace claim to work and then answer
     // `unsupported`, which is the worst of both — a skin cannot branch on it.
-    const { host, dispatch } = createIosHost(bridge, Array.isArray(declared) ? declared : []);
+    const { host, dispatch } = createAppleHost(bridge, Array.isArray(declared) ? declared : []);
 
     const api = {
         version: typeof __ORIEL_VERSION__ === "string" ? __ORIEL_VERSION__ : "dev",

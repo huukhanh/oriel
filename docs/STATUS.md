@@ -5,8 +5,9 @@ Working branch: `feat/63-browser-shell` ([PR #63](https://github.com/huukhanh/or
 
 ## What Oriel is
 
-A **browser** that stores and applies **skins** — packages of CSS, declarative
-layout operations and JavaScript that completely change a website's interface.
+A **browser for iOS and macOS** that stores and applies **skins** — packages of
+CSS, declarative layout operations and JavaScript that completely change a
+website's interface.
 Installed by pasting a file or giving a GitHub link; authored on a desktop with
 `tools/oriel`; published to GitHub like any other file.
 
@@ -29,11 +30,11 @@ lint clean · 767 unit tests · 26 end-to-end tests in real browsers
 | `engine/core/` | Targeting (235), layout operations (81), UserCSS + variables (93), userscripts (52), sources + versions (84), the skin funnel (41), the wrapper (15). Pure, and lint-enforced pure. |
 | `engine/host/` | The seam a shell must satisfy, plus a recording test host. 24 tests. |
 | `engine/runtime/` | The in-page engine. **Still speaks the extension's message protocol** — see below. |
-| `hosts/ios/` | The native bridge: wire format, both WebKit reply mechanisms, timeouts. 19 tests. |
+| `hosts/apple/` | The native bridge: wire format, both WebKit reply mechanisms, timeouts. 19 tests. |
 | `hosts/extension/` | Demoted to a test host. The only way to run the engine in a real browser here. |
 | `browser/ui/` | Manager and popup, as pure render functions. 73 tests. |
 | `browser/chrome/` | The browser's own interface, as a document rather than SwiftUI. |
-| `apple/Sources/Browser/` | The Swift shell: tabs, web views, the bridge. |
+| `apple/Sources/Browser/` | The Swift shell: tabs, web views, the bridge. One source set, UIKit and AppKit branches. |
 | `tools/oriel` | The authoring CLI. 26 tests. |
 | `skins/` | Three worked examples, installed by the e2e suite. |
 
@@ -56,7 +57,7 @@ the e2e suites exist:
 
 1. **Wire `engine/runtime` to the Host.** It still talks to the extension's
    message protocol, so the browser cannot run the engine yet —
-   `hosts/ios/main.js` establishes the bridge and stops at an honest line. This
+   `hosts/apple/main.js` establishes the bridge and stops at an honest line. This
    is the piece between here and a browser that actually skins a page.
 2. **Compile the Swift.** A Swift 6.1 toolchain and stub-framework typechecking
    work on this box, so most of the shell can be machine-checked here before
@@ -73,4 +74,3 @@ the e2e suites exist:
 - No test for the background's storage layer.
 - `oriel check <gallery-dir>` does not recognise an `index.json`.
 - The manager's editor is a textarea with a line number, nothing cleverer.
-- `docs/SAFARI.md` describes installing an extension, not a browser.

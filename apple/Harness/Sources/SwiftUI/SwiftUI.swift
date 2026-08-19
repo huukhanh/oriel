@@ -10,11 +10,22 @@
 // Every declaration below is therefore a claim to check against Xcode's
 // autocomplete. Keep it minimal: an unused stub is an unchecked claim.
 
+//
+// This one file is compiled TWICE, by two packages: `apple/Package.swift`
+// gives it the UIKit stub as a dependency, `apple/Harness/macOS/Package.swift`
+// gives it the AppKit stub instead. `canImport` therefore selects a different
+// half of every branch below in each build, exactly as it does on a real SDK.
+// It is one file rather than two copies because two copies drift.
+
 @_exported import Foundation
 // SwiftUI re-exports Combine on Apple platforms, which is why `import SwiftUI`
 // is enough to get ObservableObject there. Modelled faithfully.
 @_exported import Combine
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 // MARK: - View
 
@@ -142,7 +153,11 @@ public struct GeometryReader<Content: View>: View {
 }
 
 public struct Color: View {
+    #if canImport(UIKit)
     public init(_ color: UIColor) {}
+    #elseif canImport(AppKit)
+    public init(_ color: NSColor) {}
+    #endif
     public var body: Never { fatalError("primitive view") }
 }
 
@@ -229,7 +244,13 @@ public struct State<Value>: DynamicProperty {
     public init(wrappedValue: Value) { self.wrappedValue = wrappedValue }
 }
 
-// MARK: - UIKit interop
+// MARK: - AppKit / UIKit interop
+//
+// The same protocol twice, under the two names SwiftUI gives it. Only one of
+// them exists on any real SDK, which is why `ContentWebView` and
+// `ChromeWebView` conform in a `#if` and keep their bodies in shared methods.
+
+#if canImport(UIKit)
 
 public struct UIViewRepresentableContext<Representable> {
     public init() {}
@@ -247,3 +268,24 @@ public protocol UIViewRepresentable: View {
 extension UIViewRepresentable {
     public var body: Never { fatalError("primitive view") }
 }
+
+#elseif canImport(AppKit)
+
+public struct NSViewRepresentableContext<Representable> {
+    public init() {}
+}
+
+@MainActor
+public protocol NSViewRepresentable: View {
+    associatedtype NSViewType: NSView
+    typealias Context = NSViewRepresentableContext<Self>
+
+    func makeNSView(context: Self.Context) -> Self.NSViewType
+    func updateNSView(_ nsView: Self.NSViewType, context: Self.Context)
+}
+
+extension NSViewRepresentable {
+    public var body: Never { fatalError("primitive view") }
+}
+
+#endif

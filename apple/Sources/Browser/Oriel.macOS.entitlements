@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- macOS-only. A macOS app that is not sandboxed cannot be signed for
+	     distribution, and an unsandboxed browser is not a thing to ship. -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<!-- Outgoing connections. Without this the sandbox blocks every request
+	     the web views make and the browser loads nothing at all — a failure
+	     that looks like the network being down rather than like a missing
+	     entitlement. There is deliberately no server entitlement: nothing here
+	     listens. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+</dict>
+</plist>

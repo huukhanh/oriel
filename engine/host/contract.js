@@ -134,7 +134,7 @@ export class HostCapabilityError extends Error {
  * somewhere inside a stranger's skin.
  *
  * @param {object} spec
- * @param {string} spec.name          "ios" | "extension" | "test"
+ * @param {string} spec.name          "apple" | "extension" | "test"
  * @param {string} spec.version
  * @param {string[]} spec.capabilities
  * @param {Record<string, object>} spec.namespaces  e.g. { page: {…}, tabs: {…} }
@@ -201,7 +201,7 @@ export function exposeFor(host, { onDenied } = {}) {
 
 /** Capability sets the three hosts are expected to offer. Asserted in tests. */
 export const HOST_PROFILES = Object.freeze({
-    ios: Object.freeze([...CAPABILITIES]),
+    apple: Object.freeze([...CAPABILITIES]),
     extension: Object.freeze([
         "page.css",
         "page.dom",

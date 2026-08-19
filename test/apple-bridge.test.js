@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { createBridge, createIosHost, HANDLER, REPLY_GLOBAL } from "../hosts/ios/bridge.js";
+import { createBridge, createAppleHost, HANDLER, REPLY_GLOBAL } from "../hosts/apple/bridge.js";
 import { HostCapabilityError } from "../engine/host/contract.js";
 
 /**
@@ -158,7 +158,7 @@ describe("the ios host", () => {
     function host(capabilities) {
         const handler = replyingHandler(() => ({ ok: true, value: "done" }));
         const bridge = createBridge({ messageHandler: handler, scope: scope() });
-        return { ...createIosHost(bridge, capabilities), handler };
+        return { ...createAppleHost(bridge, capabilities), handler };
     }
 
     it("forwards a namespaced call with its method name intact", async () => {

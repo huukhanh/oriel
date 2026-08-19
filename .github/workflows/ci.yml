@@ -5,9 +5,10 @@
 # content script skins a real page, and the injection engine behaves correctly
 # in a real WebKit engine.
 #
-# ALSO DOES: typecheck the iOS browser shell's Swift against stub frameworks, so
-# an invented method or a wrong signature fails here rather than on a Mac an
-# hour later. It does not compile against the real SDK; see the job's comment.
+# ALSO DOES: typecheck the browser shell's Swift against stub frameworks, twice
+# — once as iOS and once as macOS — so an invented method or a wrong signature
+# fails here rather than on a Mac an hour later. It does not compile against the
+# real SDK; see the job's comment.
 #
 # DOES NOT: say anything about Safari on iOS, or about how any of this behaves
 # on a phone. No CI runner can load a Safari Web Extension onto a device, and no
@@ -82,6 +83,12 @@ jobs:
       # optionality and every type error, which is most of what goes wrong when
       # writing Swift without a compiler. See apple/Harness/README.md.
       - run: swift build --package-path apple
+      # The same sources again, with the AppKit stub in UIKit's place, so the
+      # `#elseif canImport(AppKit)` half of every branch in Sources/Browser is
+      # compiled too. Without this the macOS code path is only parsed, never
+      # typechecked, and the first thing to notice a wrong AppKit symbol would
+      # be a ten-times-billed macOS runner. See apple/Harness/macOS/Package.swift.
+      - run: swift build --package-path apple/Harness/macOS
 
   e2e:
     name: real browsers

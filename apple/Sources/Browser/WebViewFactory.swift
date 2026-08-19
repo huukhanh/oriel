@@ -1,7 +1,11 @@
 import Combine
 import Foundation
-import UIKit
 import WebKit
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 /// Builds and owns every web view in the browser.
 ///
@@ -119,10 +123,22 @@ final class WebViewFactory: NSObject, ObservableObject, WKNavigationDelegate {
         let configuration: WKWebViewConfiguration = makeConfiguration(isPrivate: false)
         let created: WKWebView = WKWebView(frame: CGRect.zero, configuration: configuration)
         created.navigationDelegate = self
+        #if canImport(UIKit)
+        // The chrome document paints its own background, so the web view under
+        // it must not paint one — otherwise the page never shows through a
+        // skin that makes the toolbar translucent.
+        //
+        // TODO(api-check): there is no macOS equivalent of these four lines
+        // that this project is sure of. `WKWebView` has no `scrollView` there,
+        // `NSView.isOpaque` is get-only and `NSView` has no `backgroundColor`.
+        // The AppKit answer is `underPageBackgroundColor` (macOS 12+) or the
+        // `drawsBackground` key, and neither is worth guessing at from here;
+        // the macOS chrome bar is simply opaque until someone checks.
         created.isOpaque = false
-        created.backgroundColor = UIColor.clear
-        created.scrollView.backgroundColor = UIColor.clear
+        created.backgroundColor = PlatformColor.clear
+        created.scrollView.backgroundColor = PlatformColor.clear
         created.scrollView.bounces = false
+        #endif
         chromeView = created
         loadChromeDocument(into: created)
         return created

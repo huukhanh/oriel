@@ -1,5 +1,9 @@
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 /// The whole browser: a page, and the browser's own interface under it.
 ///
@@ -22,7 +26,18 @@ struct BrowserView: View {
     /// band is the version that cannot go wrong on a device nobody here has:
     /// the page is never covered and every touch reaches what it looks like it
     /// should reach.
+    ///
+    /// The two numbers are the same layout at two densities, not two designs.
+    /// `chrome.css` drops `--o-tap` from 44px to 30px under
+    /// `(hover: hover) and (pointer: fine)`, which is exactly a Mac, and that
+    /// shortens both control rows — the tab strip and the toolbar — by 14pt
+    /// each. 96 - 2 x 14 = 68, rounded up to 72 for the 2px progress bar and
+    /// the row borders. A Mac has no thumb and no home indicator to clear.
+    #if canImport(UIKit)
     private let chromeHeight: CGFloat = 96
+    #elseif canImport(AppKit)
+    private let chromeHeight: CGFloat = 72
+    #endif
 
     init() {
         let store: TabStore = TabStore()
@@ -38,12 +53,26 @@ struct BrowserView: View {
         _bridge = StateObject(wrappedValue: transport)
     }
 
+    private var chromeArea: some View {
+        ChromeWebView(factory: factory)
+            .frame(height: chromeHeight)
+    }
+
     var body: some View {
         GeometryReader { proxy in
             VStack(spacing: 0) {
-                pageArea
-                ChromeWebView(factory: factory)
-                    .frame(height: chromeHeight)
+                // Chrome above the page on a Mac, below it on a phone. Not a
+                // port detail: on iOS the toolbar is where the thumb already
+                // is, which is why Safari moved it there, and on macOS a
+                // toolbar at the bottom of the window reads as broken. The
+                // chrome document itself is identical either way.
+                #if canImport(AppKit)
+                    chromeArea
+                    pageArea
+                #else
+                    pageArea
+                    chromeArea
+                #endif
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
             .onAppear(perform: {
@@ -60,12 +89,13 @@ struct BrowserView: View {
         if let tab = tabs.activeTab {
             ContentWebView(tab: tab, factory: factory)
         } else {
-            Color(UIColor.systemBackground)
+            Color(PlatformColor.orielWindowBackground)
         }
     }
 
     /// `oriel.native.safeArea()` answers with these. Read from SwiftUI, which
-    /// already knows them, rather than hunting for a key window in UIKit.
+    /// already knows them, rather than hunting for a key window in UIKit — and
+    /// SwiftUI is the only one of the two that answers on macOS at all.
     private func report(insets: EdgeInsets) {
         bridge.updateSafeArea(
             top: Double(insets.top),

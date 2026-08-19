@@ -1,9 +1,14 @@
-# Builds the Safari Web Extension container app for iOS.
+# Builds the browser for iOS and for macOS.
 #
 # Manual and tag-only, not on every push. macOS runners bill at ten times the
 # rate of Linux ones, and this job proves one thing — that the Swift compiles
 # and the app packages — which changes far less often than the extension does.
 # Everything about Oriel's actual behaviour is covered by ci.yml on Linux.
+#
+# Both platforms build in ONE job rather than two. They share a checkout, a
+# `pnpm build` and an `xcodegen generate`, and the second xcodebuild is a few
+# minutes on a runner that is already warm — a second job would double the
+# billed rate to re-do work that is already sitting on disk.
 #
 # The build is unsigned on purpose. No Apple certificate belongs in this
 # repository; the artifact is signed by whoever installs it, with their own
@@ -16,7 +21,8 @@ on:
     tags: ["v*"]
 
 jobs:
-  ios:
+  build:
+    name: iOS and macOS
     runs-on: macos-15
     timeout-minutes: 30
     steps:
@@ -33,17 +39,17 @@ jobs:
       # saying exactly that, which is the point of checking there too.
       - run: pnpm install --frozen-lockfile
       # Both, not just safari: the browser app target's copy phase needs
-      # dist/ios/ and fails the build before the compiler is reached without it.
+      # dist/apple/ and fails the build before the compiler is reached without it.
       - run: pnpm build
       - run: test -f dist/safari/manifest.json
-      - run: test -f dist/ios/engine.js
-      - run: test -f dist/ios/chrome.html
+      - run: test -f dist/apple/engine.js
+      - run: test -f dist/apple/chrome.html
 
       - run: brew install xcodegen
       - run: xcodegen generate
         working-directory: apple
 
-      - name: Build
+      - name: Build for iOS
         working-directory: apple
         run: |
           set -o pipefail
@@ -75,6 +81,43 @@ jobs:
           echo "extension bundle contents:"
           ls -1 "${APPEX}"
 
+      # The same Sources/Browser, compiled for AppKit. This is the first thing
+      # anywhere that puts the `#elseif canImport(AppKit)` branches in front of
+      # a real macOS SDK — ci.yml only puts them in front of this project's
+      # stubs, which are a belief about AppKit rather than AppKit.
+      #
+      # No -sdk flag: xcodebuild picks macosx from the scheme's target, and
+      # naming a macOS SDK version here would rot.
+      - name: Build for macOS
+        working-directory: apple
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project Oriel.xcodeproj \
+            -scheme OrielMacOS \
+            -configuration Release \
+            -derivedDataPath build-macos \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      # The macOS app has no extension to embed, so the thing worth asserting is
+      # the other half of the same failure: a bundle whose web payload never
+      # landed launches to a blank window and looks like a Swift bug.
+      - name: Check the web payload made it into the macOS bundle
+        working-directory: apple
+        run: |
+          APP="build-macos/Build/Products/Release/Oriel.app"
+          WEB="${APP}/Contents/Resources/Web"
+          test -d "${APP}" || { echo "no macOS app was built"; exit 1; }
+          test -f "${WEB}/engine.js" || { echo "no engine.js in the macOS bundle"; exit 1; }
+          test -f "${WEB}/chrome.html" || { echo "no chrome.html in the macOS bundle"; exit 1; }
+          echo "macOS Web/ contents:"
+          ls -1 "${WEB}"
+
+      # iOS only. The macOS build is proof that it compiles and bundles; a
+      # .app that nobody can sign is not worth uploading anywhere yet.
       - name: Package an unsigned .ipa
         working-directory: apple
         run: |

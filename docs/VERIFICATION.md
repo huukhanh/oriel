@@ -1,8 +1,9 @@
 # What is proven, and what is not
 
 This project is developed on a headless Linux box. There is no Mac, no iPhone
-and no Swift compiler in the loop — and Oriel is a browser for iOS. That gap is
-the central fact about this codebase, and most of its design follows from it.
+and no Xcode in the loop — and Oriel is a browser for **iOS and macOS**, so both
+of its shipping platforms are ones nobody here can run. That gap is the central
+fact about this codebase, and most of its design follows from it.
 
 The gap got wider when Oriel stopped being an extension
 ([decision 001](decisions/001-browser-not-extension.md)): an extension is mostly
@@ -13,7 +14,10 @@ be tested.
 
 The response is not optimism. It is to push as much of the product as possible
 into places that *can* be checked here, and then to be exact about the part that
-cannot.
+cannot. There **is** a Swift compiler on the box, and it does more than it
+sounds like it should: `swift build --package-path apple` typechecks the real
+browser sources against stub frameworks, on both the UIKit and the AppKit
+branch. What it cannot do is confirm those stubs describe Apple's actual API.
 
 ## Three layers of evidence
 
@@ -125,7 +129,7 @@ should answer the things that are structurally unknowable from here:
    unconditional — no extension CSP, no permission switch. If it does not, the
    premise of decision 001 is wrong and needs revisiting immediately.
 4. Does the native bridge answer? Every `tabs` call crosses into Swift, and a
-   silent bridge is the failure mode the timeout in `hosts/ios/bridge.js` exists
+   silent bridge is the failure mode the timeout in `hosts/apple/bridge.js` exists
    to make visible rather than fix.
 5. Is the chrome usable one-handed — tab strip scrolling, the address bar with
    the keyboard up, reachability of the toolbar on a large phone?

@@ -197,9 +197,24 @@ The engine runs against a **Host**. Three exist:
 
 | Host | What it is | Namespaces |
 |---|---|---|
-| `ios` | The browser. WKWebView, tabs, chrome. | all |
+| `apple` | The browser, on iOS and macOS. WKWebView, tabs, chrome. | all, minus the platform exceptions below |
 | `extension` | A WebExtension. Kept so the engine can be end-to-end tested in a real browser on Linux, and handy for desktop authoring. | `page`, `storage`, partial `tabs`, partial `net` |
 | `test` | In-process, for unit tests. | all, recorded rather than performed |
+
+There is **one Apple host, not one per platform.** The bridge, the wire format
+and every namespace above are identical on iOS and macOS — same WKWebView, same
+`webkit.messageHandlers` — so a skin is not written twice. What differs is a
+short list of capabilities the hardware does or does not have:
+
+| Capability | iOS | macOS | Why |
+|---|---|---|---|
+| `native.haptic` | ✓ | — | No haptic engine to speak of. |
+| `native.safeArea` | ✓ | — | No notch, no home indicator. Returns zero insets rather than being absent, so chrome skins need no branch. |
+| `native.lock` | ✓ | ✓ | Face ID / Touch ID on both. |
+| `chrome.gesture` | ✓ | partial | Swipe and long-press are touch ideas; a trackpad reports what it can. |
+
+The host declares what it actually has at startup, so this table is a
+description of current behaviour rather than something the engine hard-codes.
 
 ```js
 if (oriel.can("chrome.toolbar")) { … }
