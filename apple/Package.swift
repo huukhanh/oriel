@@ -20,6 +20,15 @@
 // loosening a stub to make code compile turns this from a check into a rubber
 // stamp. See Harness/README.md.
 //
+// THIS PACKAGE IS THE iOS HALF. It gives the stubs UIKit, so `canImport(UIKit)`
+// is true and the browser's sources take their iOS branch. The macOS branch —
+// `#elseif canImport(AppKit)` — is not compiled here at all, and an unexercised
+// conditional branch is exactly what a harness is for. `Harness/macOS/Package.swift`
+// is the same sources and the same stubs with AppKit in UIKit's place. Run both:
+//
+//     swift build --package-path apple
+//     swift build --package-path apple/Harness/macOS
+//
 // Every target is pinned to Swift 5 language mode, because that is what
 // `project.yml` pins the Xcode targets to. Without the pin, tools-version 6.0
 // would typecheck under Swift 6 strict concurrency — rules the real build never
@@ -58,7 +67,9 @@ let package = Package(
             name: "Browser",
             dependencies: ["SwiftUI", "UIKit", "WebKit", "Combine"],
             path: "Sources/Browser",
-            exclude: ["Info.plist"],
+            // Not Swift, and not resources either: the two Info.plists and the
+            // macOS entitlements belong to the Xcode targets in project.yml.
+            exclude: ["Info.plist", "Info.macOS.plist", "Oriel.macOS.entitlements"],
             swiftSettings: swift5
         )
     ]

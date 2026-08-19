@@ -5,7 +5,8 @@ developed on. There **is** a Swift compiler. This directory is what closes as
 much of that gap as a Linux box can.
 
 ```sh
-swift build --package-path apple      # from the repo root; ~10s cold
+swift build --package-path apple                 # as iOS;   ~10s cold
+swift build --package-path apple/Harness/macOS   # as macOS; ~10s cold
 ```
 
 `apple/Package.swift` compiles `apple/Sources/Browser` — **the real files,
@@ -13,14 +14,52 @@ unmodified, not a copy** — against hand-written stubs of the four frameworks i
 imports. XcodeGen ignores a `Package.swift` sitting beside `project.yml`, so the
 shipping build and this one coexist without knowing about each other.
 
+## Two flavours, one source set
+
+The browser is iOS and macOS from one directory, with about twenty lines inside
+`#if canImport(UIKit)` / `#elseif canImport(AppKit)`. The iOS package proves the
+first branch of each of those. It says nothing whatsoever about the second — an
+unexercised conditional branch is only *parsed*, never typechecked, so an
+invented `NSColor.systemBackground` would sit there compiling perfectly until a
+ten-times-billed macOS runner reached it.
+
+So `apple/Harness/macOS/Package.swift` compiles the same sources again with the
+**AppKit** stub where UIKit was. The mechanism is blunt: `canImport(UIKit)` is
+true whenever the UIKit stub is reachable, so the macOS package must not depend
+on it, directly or transitively — and does not.
+
+Two packages rather than two targets in one, because the sources say
+`import SwiftUI` and `import WebKit` and a single SwiftPM package cannot hold
+two targets named `SwiftUI`. Nothing is duplicated: `Harness/macOS/Sources/` is
+five symlinks, and each stub file branches on `canImport` internally to pick the
+flavour its manifest handed it.
+
+Both must be green. Green in one and red in the other is what a platform bug
+looks like here, and it is the normal shape of the first failure.
+
 ## What green means
 
 **It proves:** the Swift parses; its types line up; every symbol it names is one
 it can reach; every call site matches the signature it is calling; the property
-wrappers, result builders and protocol conformances all resolve. Empirically,
-that is most of what goes wrong when writing Swift blind. A negative control —
-renaming `stopLoading()` to `stopLoadingNow()` and giving `reload()` an argument
-— fails the build with exactly those two errors.
+wrappers, result builders and protocol conformances all resolve — on **both**
+platforms. Empirically, that is most of what goes wrong when writing Swift
+blind. A negative control — renaming `stopLoading()` to `stopLoadingNow()` and
+giving `reload()` an argument — fails the build with exactly those two errors.
+
+The two-flavour claim has its own negative control, and it is worth re-running
+whenever a stub grows a platform branch, because a harness that silently
+compiles the same branch twice is worse than no harness:
+
+| Change | iOS package | macOS package |
+|---|---|---|
+| `PlatformColor.windowBackgroundColor` → `.systemBackground` in the AppKit branch | green | **red**: `'PlatformColor' (aka 'NSColor') has no member 'systemBackground'` |
+| `.systemBackground` → `.windowBackgroundColor` in the UIKit branch | **red**: `(aka 'UIColor') has no member 'windowBackgroundColor'` | green |
+| `makeNSView` renamed | green | **red**: does not conform to `NSViewRepresentable` |
+
+Note that a *syntax* error fails both packages regardless of which branch it is
+in — Swift parses inactive `#if` branches. Only a semantic error distinguishes
+them, which is why the controls above are misspelled members rather than
+misspelled Swift.
 
 **It does not prove** that the stubbed API surface is Apple's. The stubs are
 this project's *belief* about UIKit, WebKit, SwiftUI and Combine, written from
@@ -66,13 +105,22 @@ Four, all forced by Linux, all recorded in the stub file headers:
 ## Layout
 
 ```
-apple/Package.swift                    the manifest; package root is apple/
+apple/Package.swift                    the iOS manifest; package root is apple/
 apple/Sources/Browser/                 the real, shipping source (target: Browser)
-apple/Harness/Sources/SwiftUI/         stub
+apple/Harness/Sources/SwiftUI/         stub — UIViewRepresentable or NSViewRepresentable
 apple/Harness/Sources/UIKit/           stub
+apple/Harness/Sources/AppKit/          stub — nothing here has ever met real AppKit
 apple/Harness/Sources/WebKit/          stub — read this one first
 apple/Harness/Sources/Combine/         stub — ObservableObject and @Published
+apple/Harness/macOS/Package.swift      the macOS manifest
+apple/Harness/macOS/Sources/           five symlinks to the directories above
 ```
+
+The SwiftUI and WebKit stubs are each compiled twice, once by each manifest, and
+branch on `canImport` internally: SwiftUI declares `UIViewRepresentable` or
+`NSViewRepresentable`, and `WKWebView` inherits from `UIView` or `NSView`.
+`AppKit` deserves the most suspicion of the five — it is the only stub no build
+of this project has ever checked against Apple's headers, even once.
 
 `Combine` has its own target rather than living inside the SwiftUI stub because
 that distinction is real and it already caught a bug: `ObservableObject` and
@@ -80,6 +128,6 @@ that distinction is real and it already caught a bug: `ObservableObject` and
 Foundation. SwiftUI re-exports Combine, which is exactly why that mistake is
 easy to make and easy to miss.
 
-CI runs this on every pull request as the `swift typecheck` job in
-`.github/workflows/ci.yml`. The macOS job in `.github/workflows/apple.yml` is
-still the first thing that sees the real SDK.
+CI runs both on every pull request as the `swift typecheck` job in
+`.github/workflows/ci.yml`. `.github/workflows/apple.yml` is still the first
+thing that sees a real SDK, and now builds both schemes.

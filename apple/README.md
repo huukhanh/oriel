@@ -1,7 +1,15 @@
 # apple/
 
-The iOS side of Oriel: a **browser**, and the Safari Web Extension that is now
-kept only as a test host.
+The Apple side of Oriel: a **browser** for iOS and macOS, and the Safari Web
+Extension that is now kept only as a test host.
+
+One source set, not two. `Sources/Browser` is compiled by both app targets;
+about twenty of its 1300 lines sit inside `#if canImport(UIKit)` /
+`#elseif canImport(AppKit)`, and `Sources/Browser/Platform.swift` holds the
+typealiases the rest of the code uses instead of branching. The branches are
+written with `canImport` rather than `os(macOS)` so that the typecheck harness,
+which runs on Linux where `os(macOS)` is false either way, can compile both
+halves.
 
 `project.yml` is the source of truth. The `.xcodeproj` is generated and not
 checked in.
@@ -11,7 +19,7 @@ pnpm install
 pnpm build          # must produce dist/apple/ and dist/safari/
 cd apple
 xcodegen generate
-open Oriel.xcodeproj
+open Oriel.xcodeproj   # schemes: Oriel (iOS), OrielMacOS (macOS 13+)
 ```
 
 The build **fails loudly** if `dist/apple/engine.js`, `dist/apple/chrome.html` or
@@ -41,12 +49,14 @@ message bridge, and tab lifecycle. Nothing else belongs here. See
 | `Sources/Browser/BrowserView.swift` | The root: the page area above, the chrome document below. Wires the three objects together in `init`. |
 | `Sources/Browser/TabStore.swift` | Tabs and every rule about them — insertion order, close-activates-neighbour, restore on launch. The one file here worth reading. |
 | `Sources/Browser/Tab.swift` | A tab as a plain `Codable` value. |
-| `Sources/Browser/ContentWebView.swift` | `UIViewRepresentable` that swaps the active tab's web view into a container. |
-| `Sources/Browser/ChromeWebView.swift` | `UIViewRepresentable` around the chrome document's web view. |
+| `Sources/Browser/Platform.swift` | The whole iOS/macOS difference: `PlatformView`, `PlatformColor`, an autoresizing mask and a window background colour. |
+| `Sources/Browser/ContentWebView.swift` | Swaps the active tab's web view into a container. `UIViewRepresentable` on iOS, `NSViewRepresentable` on macOS, over one shared body. |
+| `Sources/Browser/ChromeWebView.swift` | The same shape, around the chrome document's web view. |
 | `Sources/Browser/WebViewFactory.swift` | Builds the shared configuration and the user scripts, owns every web view, and is the navigation delegate. |
 | `Sources/Browser/Bridge.swift` | `WKScriptMessageHandler`. The transport under the `ios` host in `engine/host/contract.js`. |
 | `Sources/Browser/BridgeCommand.swift` | The wire format, both directions. |
-| `Package.swift`, `Harness/` | A typecheck harness: stub frameworks that let a Linux box compile all of the above. Not shipped. See `Harness/README.md`. |
+| `Sources/Browser/Info.macOS.plist`, `Sources/Browser/Oriel.macOS.entitlements` | macOS only. The sandbox is on and `com.apple.security.network.client` is what lets the web views reach the network at all. |
+| `Package.swift`, `Harness/` | A typecheck harness: stub frameworks that let a Linux box compile all of the above, twice — as iOS and as macOS. Not shipped. See `Harness/README.md`. |
 
 ## The bundle layout
 
@@ -138,7 +148,10 @@ returns `unsupported` today. Nothing is stubbed silently.
 
 ## Known gaps
 
-- **The chrome bar is a fixed 96pt band at the bottom.** A skin cannot yet make
+- **The chrome bar is a fixed band at the bottom** — 96pt on iOS, 72pt on
+  macOS, where `chrome.css` drops `--o-tap` from 44px to 30px under
+  `(hover: hover) and (pointer: fine)` and takes 14pt off each of the two
+  control rows. A skin cannot yet make
   it taller or turn it into an overlay; that needs the chrome document to report
   its own height, and an overlaid transparent web view needs hit-testing that
   lets touches through to the page. `BrowserView.chromeHeight`.
@@ -161,20 +174,28 @@ returns `unsupported` today. Nothing is stubbed silently.
 
 ## Compile status
 
-There is no Xcode and no iOS SDK here, but there is a Swift compiler, and
+There is no Xcode and no Apple SDK here, but there is a Swift compiler, and
 
 ```sh
-swift build --package-path apple
+swift build --package-path apple                 # as iOS,   against the UIKit stub
+swift build --package-path apple/Harness/macOS   # as macOS, against the AppKit stub
 ```
 
-typechecks `Sources/Browser` — the real files, unmodified — against stub
-frameworks in `Harness/`. It is green, and CI runs it on every pull request as
-the `swift typecheck` job. **Read `Harness/README.md` before trusting that.** It
+typecheck `Sources/Browser` — the real files, unmodified — against stub
+frameworks in `Harness/`. Both are green, and CI runs both on every pull request
+as the `swift typecheck` job. Two commands rather than one because the browser's
+sources say `import SwiftUI` and `import WebKit`, and one SwiftPM package cannot
+hold two targets called `SwiftUI`; the stub *files* are shared by symlink, so
+there is only ever one copy of each. **Read `Harness/README.md` before trusting that.** It
 proves the Swift is internally consistent and agrees with the API surface the
 stubs describe; it does not prove that surface is Apple's. The stubs are the
 list of signatures a human should check against Xcode's autocomplete.
 
-The macOS job in `.github/workflows/apple.yml` is still the first thing that
-sees the real SDK. That workflow currently runs `pnpm build --target safari`
-only and will need `dist/apple/` built too, or the app target's copy phase stops
-it before the compiler is reached.
+`.github/workflows/apple.yml` is still the first thing that sees a real SDK. It
+builds both schemes — `Oriel` for iOS and `OrielMacOS` for macOS — in one job,
+because they share a checkout and a `pnpm build` and a second macOS runner would
+double a ten-times-billed rate to redo work already on disk.
+
+**Nothing in this project has ever compiled a line of AppKit.** The AppKit stub
+is a first-time claim rather than one a Mac build has survived; its file header
+lists the three symbols worth checking against Xcode's autocomplete first.
