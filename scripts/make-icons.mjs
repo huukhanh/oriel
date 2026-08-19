@@ -49,14 +49,23 @@ const INK = [255, 255, 255];
 
 /**
  * @param {number} size
- * @param {boolean} opaque  iOS rejects an app icon that has an alpha channel,
- *   and applies its own corner mask, so that one is drawn full-bleed and solid.
- *   Everything else keeps its own rounded tile, because a browser toolbar puts
- *   the icon on whatever colour it likes.
+ * @param {"tile"|"ios"|"macos"} shape
+ *   `ios` — full-bleed and fully opaque. iOS rejects an app icon with an alpha
+ *     channel and applies its own corner mask, so drawing our own would show
+ *     through as a dark fringe.
+ *   `macos` — the opposite convention. macOS does *not* mask the icon, so the
+ *     rounded shape and the transparent margin around it have to be in the
+ *     image. The inset is what makes an icon sit correctly next to Apple's own
+ *     in the Dock.
+ *   `tile` — a rounded tile with no inset, for a browser toolbar that puts the
+ *     icon on whatever colour it likes.
  */
-function render(size, opaque) {
+function render(size, shape) {
     const feather = Math.max(1, size / 24);
     const pixels = Buffer.alloc(size * size * 4);
+    // macOS reserves roughly a tenth of the canvas as margin.
+    const inset = shape === "macos" ? size * 0.095 : 0;
+    const span = size - inset * 2;
 
     for (let y = 0; y < size; y++) {
         for (let x = 0; x < size; x++) {
@@ -65,23 +74,23 @@ function render(size, opaque) {
 
             // The tile itself. Extension toolbars and iOS both round the corners
             // for us, but a shape that is already round survives either.
-            const tile = roundedRect(px, py, size / 2, size / 2, size / 2, size / 2, size * 0.22);
-            const tileAlpha = opaque ? 1 : coverage(tile, feather);
+            const tile = roundedRect(px, py, size / 2, size / 2, span / 2, span / 2, span * 0.22);
+            const tileAlpha = shape === "ios" ? 1 : coverage(tile, feather);
 
             let colour = mix(TOP, BOTTOM, y / size);
 
             // The site: an outline, because it is what is already there.
-            const siteCentre = size * 0.40;
-            const site = roundedRect(px, py, siteCentre, siteCentre, size * 0.21, size * 0.21, size * 0.06);
-            const siteRing = Math.abs(site) - size * 0.035;
+            const siteCentre = inset + span * 0.40;
+            const site = roundedRect(px, py, siteCentre, siteCentre, span * 0.21, span * 0.21, span * 0.06);
+            const siteRing = Math.abs(site) - span * 0.035;
             colour = over(colour, INK, coverage(siteRing, feather) * 0.92);
 
             // The skin: solid, laid over the site and offset, with a gap punched
             // through the outline beneath so the two read as separate layers
             // rather than one muddled shape.
-            const skinCentre = size * 0.60;
-            const skin = roundedRect(px, py, skinCentre, skinCentre, size * 0.21, size * 0.21, size * 0.06);
-            const gap = skin - size * 0.045;
+            const skinCentre = inset + span * 0.60;
+            const skin = roundedRect(px, py, skinCentre, skinCentre, span * 0.21, span * 0.21, span * 0.06);
+            const gap = skin - span * 0.045;
             colour = mix(colour, mix(TOP, BOTTOM, y / size), coverage(gap, feather));
             colour = over(colour, INK, coverage(skin, feather));
 
@@ -140,18 +149,28 @@ function crc32(buffer) {
     return (c ^ 0xffffffff) >>> 0;
 }
 
-function write(path, size, opaque = false) {
+function write(path, size, shape = "tile") {
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, png(size, render(size, opaque)));
+    writeFileSync(path, png(size, render(size, shape)));
     return path;
 }
+
+/** The sizes a macOS icon set needs, as 1x/2x pairs of five nominal sizes. */
+const MAC_SIZES = [16, 32, 64, 128, 256, 512, 1024];
 
 const written = [
     write(join(root, "assets", "icons", "icon-16.png"), 16),
     write(join(root, "assets", "icons", "icon-32.png"), 32),
     write(join(root, "assets", "icons", "icon-48.png"), 48),
     write(join(root, "assets", "icons", "icon-128.png"), 128),
-    write(join(root, "apple", "Sources", "Assets.xcassets", "AppIcon.appiconset", "icon-1024.png"), 1024, true)
+    write(join(root, "apple", "Sources", "Assets.xcassets", "AppIcon.appiconset", "icon-1024.png"), 1024, "ios"),
+    ...MAC_SIZES.map((size) =>
+        write(
+            join(root, "apple", "Sources", "Assets.xcassets", "AppIcon.appiconset", `mac-${size}.png`),
+            size,
+            "macos"
+        )
+    )
 ];
 
 process.stdout.write(`${written.length} icons written\n`);

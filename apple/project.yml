@@ -133,6 +133,7 @@ targets:
           # The iOS app's Info.plist. Naming it here keeps it out of the macOS
           # bundle's Resources, where a second Info.plist is at best confusing.
           - Info.plist
+      - path: Sources/Assets.xcassets
     settings:
       base:
         # The same app on a different platform, so the same identifier. Nothing
@@ -148,12 +149,15 @@ targets:
         # CODE_SIGN_ENTITLEMENTS, which is why this sits on the target rather
         # than in the shared base.
         CODE_SIGN_ENTITLEMENTS: Sources/Browser/Oriel.macOS.entitlements
-        # Deliberately absent: TARGETED_DEVICE_FAMILY (an iOS setting) and
-        # ASSETCATALOG_COMPILER_APPICON_NAME. Sources/Assets.xcassets holds one
-        # 1024pt icon marked `"platform": "ios"`, so pointing a macOS build at
-        # it would ask actool for images that are not in there.
-        # TODO(icon): a macOS idiom in AppIcon.appiconset, then add the catalog
-        # to this target's sources and set ASSETCATALOG_COMPILER_APPICON_NAME.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # Deliberately absent: TARGETED_DEVICE_FAMILY, which is an iOS setting
+        # meaning iPhone and iPad.
+        #
+        # AppIcon.appiconset carries both idioms: one full-bleed opaque 1024
+        # for iOS, which masks and rounds the icon itself, and a `mac` set at
+        # every size, which macOS does not mask — so the rounded shape and the
+        # transparent margin are drawn into those images. Both come from
+        # scripts/make-icons.mjs; regenerate rather than editing them.
     postBuildScripts:
       - name: Copy the browser's web payload
         # Identical to the iOS target's, and identical on purpose. On macOS

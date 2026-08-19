@@ -53,12 +53,26 @@ struct BrowserView: View {
         _bridge = StateObject(wrappedValue: transport)
     }
 
+    private var chromeArea: some View {
+        ChromeWebView(factory: factory)
+            .frame(height: chromeHeight)
+    }
+
     var body: some View {
         GeometryReader { proxy in
             VStack(spacing: 0) {
-                pageArea
-                ChromeWebView(factory: factory)
-                    .frame(height: chromeHeight)
+                // Chrome above the page on a Mac, below it on a phone. Not a
+                // port detail: on iOS the toolbar is where the thumb already
+                // is, which is why Safari moved it there, and on macOS a
+                // toolbar at the bottom of the window reads as broken. The
+                // chrome document itself is identical either way.
+                #if canImport(AppKit)
+                    chromeArea
+                    pageArea
+                #else
+                    pageArea
+                    chromeArea
+                #endif
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
             .onAppear(perform: {
