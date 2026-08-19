@@ -2,9 +2,10 @@
 
 **Rebuild any website's interface, and share the result as a file on GitHub.**
 
-Oriel is a **browser** that stores and applies **skins** — packages of CSS,
-declarative layout operations and JavaScript that change a site's interface
-completely. Not a dark mode. A different front end for someone else's website.
+Oriel is a **browser for iOS and macOS** that stores and applies **skins** —
+packages of CSS, declarative layout operations and JavaScript that change a
+site's interface completely. Not a dark mode. A different front end for someone
+else's website.
 
 It is a browser rather than an extension because an extension is a guest: it
 cannot reliably run a skin's JavaScript, cannot see the page's own navigation,
@@ -56,23 +57,35 @@ The full contract is [`docs/SKIN-FORMAT.md`](docs/SKIN-FORMAT.md).
 
 ## Install it
 
-**The browser, on an iPhone or iPad.** It is a sideloaded app, signed with your
-own Apple ID — see [`docs/SAFARI.md`](docs/SAFARI.md) for the full path,
-including what to do when something fails. CI builds an unsigned `.ipa` you can
-sign yourself, so no Mac is needed to get one.
+Oriel is a browser for **iPhone, iPad and Mac** — one app, one engine, the same
+skins on both. It is not in any app store; you build it, or you sign a build
+with your own Apple ID. [`docs/INSTALL.md`](docs/INSTALL.md) is the full path,
+including what to do when something fails.
 
-**On a desktop, for authoring.** The same engine also builds as a WebExtension.
-It cannot do everything the browser can — no tabs API of its own, no browser
-chrome, and Chromium will not run a skin's JavaScript at all — but it is the
-fastest way to iterate on a skin's CSS and layout, and it is what the
-end-to-end suite runs against:
+**On a Mac** — build and run it. macOS 13 or later.
 
 ```sh
 pnpm install && pnpm build
+brew install xcodegen && cd apple && xcodegen generate && open Oriel.xcodeproj
 ```
+
+**On an iPhone or iPad** — the same project, or take the unsigned `.ipa` CI
+builds on every tagged release and sign it yourself, so no Mac is needed.
+iOS 16.4 or later.
+
+<details>
+<summary>There is also a WebExtension build. It is not the product.</summary>
+
+The same engine builds as a WebExtension, because that is the only way to run it
+inside a real browser on a Linux machine — which is what the end-to-end suite
+does. It is also a fast way to iterate on a skin's CSS from a desktop. It cannot
+do what the browser can: no tabs API of its own, no browser chrome, and Chromium
+will not run a skin's JavaScript at all.
 
 - Chromium: `chrome://extensions` → Developer mode → *Load unpacked* → `dist/chrome`
 - Firefox: `about:debugging` → *This Firefox* → *Load Temporary Add-on* → `dist/firefox/manifest.json`
+
+</details>
 
 ## Write a skin
 
