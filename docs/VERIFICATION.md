@@ -81,7 +81,18 @@ same — all of that is Safari's own layer, and nothing here touches it.
 **iOS.** Enabling an extension, granting per-site access, the page menu, and
 whether any of it is usable one-handed.
 
-**The Swift.** `apple/` cannot be compiled here. `.github/workflows/apple.yml`
+**The Swift, but less than before.** `apple/` cannot be *built* here — there is
+no iOS or macOS SDK — but it is typechecked on both platform branches on every
+push, and `apple.yml` builds both for real on a macOS runner.
+
+The division of labour is worth stating, because a green typecheck is easy to
+over-read. The harness catches internal inconsistency and anything that
+contradicts what the stubs claim. The real SDK catches what the stubs claim
+*wrongly* — which has happened once: `allowsInlineMediaPlayback` is iOS-only,
+the stub declared it for both, and a macOS runner found it. The stub is now
+platform-conditional and reproduces that error locally in under a second.
+
+The original point stands: `.github/workflows/apple.yml`
 is the first thing that ever does, and it also asserts that the built web
 extension landed inside the `.appex` — because a bundle missing its
 `manifest.json` installs fine and then does nothing at all.

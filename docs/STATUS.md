@@ -34,7 +34,7 @@ lint clean · 767 unit tests · 26 end-to-end tests in real browsers
 | `hosts/extension/` | Demoted to a test host. The only way to run the engine in a real browser here. |
 | `browser/ui/` | Manager and popup, as pure render functions. 73 tests. |
 | `browser/chrome/` | The browser's own interface, as a document rather than SwiftUI. |
-| `apple/Sources/Browser/` | The Swift shell: tabs, web views, the bridge. One source set, UIKit and AppKit branches. |
+| `apple/Sources/Browser/` | The Swift shell: tabs, web views, the bridge. One source set; UIKit and AppKit branches, both typechecked. **Builds for iOS and macOS against the real SDKs.** |
 | `tools/oriel` | The authoring CLI. 26 tests. |
 | `skins/` | Three worked examples, installed by the e2e suite. |
 
@@ -59,10 +59,10 @@ the e2e suites exist:
    message protocol, so the browser cannot run the engine yet —
    `hosts/apple/main.js` establishes the bridge and stops at an honest line. This
    is the piece between here and a browser that actually skins a page.
-2. **Compile the Swift.** A Swift 6.1 toolchain and stub-framework typechecking
-   work on this box, so most of the shell can be machine-checked here before
-   `apple.yml` ever runs. What that cannot check is whether the Apple API
-   signatures are real — that list goes to a human with Xcode.
+2. **Close the remaining Apple TODOs.** A transparent chrome web view on macOS
+   (`NSView.isOpaque` is get-only and the honest alternative was not certain
+   enough to guess), and the handful of `TODO(api:)` namespaces in
+   `Bridge.swift` that still answer `unsupported`.
 3. **A device test.** [#61](https://github.com/huukhanh/oriel/issues/61) is
    written for the extension build and needs rewriting. The question that
    matters most is now different: an extension had to ask whether skin
