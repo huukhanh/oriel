@@ -5,8 +5,9 @@ Working branch: `feat/63-browser-shell` ([PR #63](https://github.com/huukhanh/or
 
 ## What Oriel is
 
-A **browser** that stores and applies **skins** — packages of CSS, declarative
-layout operations and JavaScript that completely change a website's interface.
+A **browser for iOS and macOS** that stores and applies **skins** — packages of
+CSS, declarative layout operations and JavaScript that completely change a
+website's interface.
 Installed by pasting a file or giving a GitHub link; authored on a desktop with
 `tools/oriel`; published to GitHub like any other file.
 
@@ -33,7 +34,7 @@ lint clean · 767 unit tests · 26 end-to-end tests in real browsers
 | `hosts/extension/` | Demoted to a test host. The only way to run the engine in a real browser here. |
 | `browser/ui/` | Manager and popup, as pure render functions. 73 tests. |
 | `browser/chrome/` | The browser's own interface, as a document rather than SwiftUI. |
-| `apple/Sources/Browser/` | The Swift shell: tabs, web views, the bridge. |
+| `apple/Sources/Browser/` | The Swift shell: tabs, web views, the bridge. One source set, UIKit and AppKit branches. |
 | `tools/oriel` | The authoring CLI. 26 tests. |
 | `skins/` | Three worked examples, installed by the e2e suite. |
 
@@ -73,4 +74,3 @@ the e2e suites exist:
 - No test for the background's storage layer.
 - `oriel check <gallery-dir>` does not recognise an `index.json`.
 - The manager's editor is a textarea with a line number, nothing cleverer.
-- `docs/SAFARI.md` describes installing an extension, not a browser.
